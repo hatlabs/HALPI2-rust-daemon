@@ -111,7 +111,7 @@ impl StateMachine {
                 // Read DC input voltage
                 let v_in = {
                     let mut device = self.device.lock().await;
-                    device.get_dcin_voltage()?
+                    device.get_measurements()?.dcin_voltage
                 };
 
                 // Check for blackout
@@ -133,7 +133,7 @@ impl StateMachine {
                 // Read DC input voltage
                 let v_in = {
                     let mut device = self.device.lock().await;
-                    device.get_dcin_voltage()?
+                    device.get_measurements()?.dcin_voltage
                 };
 
                 // Check for power restoration

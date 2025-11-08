@@ -195,10 +195,10 @@ mod tests {
     fn test_app_state_creation() {
         // Skip test if I2C hardware not available
         let device = match HalpiDevice::new(1, 0x6D) {
-            Ok(d) => d,
+            Ok(d) => Arc::new(Mutex::new(d)),
             Err(_) => return,
         };
-        let config = Config::default();
+        let config = Arc::new(RwLock::new(Config::default()));
         let state = AppState::new(device, config);
 
         assert_eq!(state.version, env!("CARGO_PKG_VERSION"));
@@ -208,10 +208,10 @@ mod tests {
     fn test_create_app() {
         // Skip test if I2C hardware not available
         let device = match HalpiDevice::new(1, 0x6D) {
-            Ok(d) => d,
+            Ok(d) => Arc::new(Mutex::new(d)),
             Err(_) => return,
         };
-        let config = Config::default();
+        let config = Arc::new(RwLock::new(Config::default()));
         let state = AppState::new(device, config);
 
         let _app = create_app(state);
