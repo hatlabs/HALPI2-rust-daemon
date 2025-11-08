@@ -36,6 +36,9 @@ i2cdev = "0.6"
 # CRC32
 crc32fast = "1.4"
 
+# Unix system calls
+libc = "0.2"
+
 # Error handling
 anyhow = "1.0"
 thiserror = "2.0"

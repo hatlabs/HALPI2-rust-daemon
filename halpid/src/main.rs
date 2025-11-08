@@ -1,4 +1,5 @@
 pub mod i2c;
+pub mod server;
 
 fn main() {
     println!("halpid - HALPI2 power monitor and watchdog daemon");
