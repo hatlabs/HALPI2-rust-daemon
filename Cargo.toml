@@ -21,6 +21,7 @@ tower = "0.5"
 tower-http = { version = "0.6", features = ["trace"] }
 hyper = { version = "1.5", features = ["full"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
 
 # CLI
 clap = { version = "4.5", features = ["derive", "cargo"] }
@@ -49,6 +50,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Date/time handling
 chrono = "0.4"
+
+# Unix socket HTTP client
+hyperlocal = "0.9"
 
 # Shared workspace crate
 halpi-common = { path = "halpi-common" }

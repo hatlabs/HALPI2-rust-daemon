@@ -14,11 +14,13 @@ halpi-common.workspace = true
 tokio.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
+http-body-util.workspace = true
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
+hyperlocal.workspace = true
 
 [[bin]]
 name = "halpi"
