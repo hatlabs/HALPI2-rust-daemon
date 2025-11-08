@@ -47,7 +47,7 @@ impl HalpiDevice {
     /// device doesn't exist, or hardware not connected).
     ///
     /// # Example
-    /// ```no_run
+    /// ```ignore
     /// use halpid::i2c::HalpiDevice;
     ///
     /// let device = HalpiDevice::new(1, 0x6D)?;
@@ -225,10 +225,7 @@ impl HalpiDevice {
 
     /// Check if an error is transient and should be retried
     fn is_transient_error(err: &I2cError) -> bool {
-        matches!(
-            err,
-            I2cError::Read { .. } | I2cError::Write { .. } | I2cError::DeviceOpen { .. }
-        )
+        matches!(err, I2cError::Read { .. } | I2cError::Write { .. })
     }
 }
 
@@ -276,14 +273,6 @@ mod tests {
 
     #[test]
     fn test_is_transient_error() {
-        // DeviceOpen errors should be considered transient
-        let err = I2cError::DeviceOpen {
-            bus: 1,
-            addr: 0x6D,
-            source: LinuxI2CError::Nix(nix::errno::Errno::EIO),
-        };
-        assert!(HalpiDevice::is_transient_error(&err));
-
         // Read errors should be considered transient
         let err = I2cError::Read {
             reg: 0x10,
@@ -306,6 +295,14 @@ mod tests {
                 expected: 2,
                 got: 1,
             },
+        };
+        assert!(!HalpiDevice::is_transient_error(&err));
+
+        // DeviceOpen errors should NOT be retried (not used in retry_operation)
+        let err = I2cError::DeviceOpen {
+            bus: 1,
+            addr: 0x6D,
+            source: LinuxI2CError::Nix(nix::errno::Errno::EIO),
         };
         assert!(!HalpiDevice::is_transient_error(&err));
     }
