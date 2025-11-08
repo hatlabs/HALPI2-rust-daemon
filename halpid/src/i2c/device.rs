@@ -78,10 +78,7 @@ impl HalpiDevice {
         self.retry_operation(|device| {
             device
                 .smbus_read_byte_data(reg)
-                .map_err(|e| I2cError::Read {
-                    reg,
-                    source: e.into(),
-                })
+                .map_err(|e| I2cError::Read { reg, source: e })
         })
     }
 
@@ -94,10 +91,7 @@ impl HalpiDevice {
             device
                 .write(&[reg])
                 .and_then(|_| device.read(&mut buffer))
-                .map_err(|e| I2cError::Read {
-                    reg,
-                    source: e.into(),
-                })?;
+                .map_err(|e| I2cError::Read { reg, source: e })?;
             Ok(buffer)
         })
     }
@@ -136,10 +130,7 @@ impl HalpiDevice {
         self.retry_operation(|device| {
             device
                 .smbus_write_byte_data(reg, value)
-                .map_err(|e| I2cError::Write {
-                    reg,
-                    source: e.into(),
-                })
+                .map_err(|e| I2cError::Write { reg, source: e })
         })
     }
 
@@ -152,10 +143,7 @@ impl HalpiDevice {
         self.retry_operation(|device| {
             device
                 .write(&[reg, bytes[0], bytes[1]])
-                .map_err(|e| I2cError::Write {
-                    reg,
-                    source: e.into(),
-                })
+                .map_err(|e| I2cError::Write { reg, source: e })
         })
     }
 
@@ -168,10 +156,9 @@ impl HalpiDevice {
             let mut data = Vec::with_capacity(1 + values.len());
             data.push(reg);
             data.extend_from_slice(values);
-            device.write(&data).map_err(|e| I2cError::Write {
-                reg,
-                source: e.into(),
-            })
+            device
+                .write(&data)
+                .map_err(|e| I2cError::Write { reg, source: e })
         })
     }
 
