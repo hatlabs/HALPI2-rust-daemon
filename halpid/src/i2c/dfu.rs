@@ -96,7 +96,7 @@ impl HalpiDevice {
     /// Returns `I2cError` if the status cannot be read from the device.
     pub fn get_dfu_status(&mut self) -> Result<DFUState, I2cError> {
         let status_byte = self.read_byte(protocol::REG_DFU_STATUS)?;
-        DFUState::from_byte(status_byte).ok_or(I2cError::InvalidDfuState {
+        DFUState::from_byte(status_byte).map_err(|_| I2cError::InvalidDfuState {
             state: status_byte,
         })
     }

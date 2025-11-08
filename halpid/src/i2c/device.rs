@@ -74,8 +74,7 @@ impl HalpiDevice {
     /// Read a single byte from a register
     ///
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
-    #[allow(dead_code)]
-    fn read_byte(&mut self, reg: u8) -> Result<u8, I2cError> {
+    pub(super) fn read_byte(&mut self, reg: u8) -> Result<u8, I2cError> {
         self.retry_operation(|device| {
             device
                 .smbus_read_byte_data(reg)
@@ -100,8 +99,7 @@ impl HalpiDevice {
     /// Read a 16-bit word from a register (big-endian)
     ///
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
-    #[allow(dead_code)]
-    fn read_word(&mut self, reg: u8) -> Result<u16, I2cError> {
+    pub(super) fn read_word(&mut self, reg: u8) -> Result<u16, I2cError> {
         let bytes = self.read_bytes(reg, 2)?;
         protocol::decode_word(&bytes).map_err(|e| I2cError::Protocol {
             reg,
@@ -126,8 +124,7 @@ impl HalpiDevice {
     /// Write a single byte to a register
     ///
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
-    #[allow(dead_code)]
-    fn write_byte(&mut self, reg: u8, value: u8) -> Result<(), I2cError> {
+    pub(super) fn write_byte(&mut self, reg: u8, value: u8) -> Result<(), I2cError> {
         self.retry_operation(|device| {
             device
                 .smbus_write_byte_data(reg, value)
@@ -151,8 +148,7 @@ impl HalpiDevice {
     /// Write multiple bytes to a register
     ///
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
-    #[allow(dead_code)]
-    fn write_bytes(&mut self, reg: u8, values: &[u8]) -> Result<(), I2cError> {
+    pub(super) fn write_bytes(&mut self, reg: u8, values: &[u8]) -> Result<(), I2cError> {
         self.retry_operation(|device| {
             let mut data = Vec::with_capacity(1 + values.len());
             data.push(reg);
