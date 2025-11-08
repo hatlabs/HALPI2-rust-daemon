@@ -190,7 +190,9 @@ impl HalpiDevice {
     /// Returns `I2cError` if the version cannot be read from the device.
     pub fn get_hardware_version(&mut self) -> Result<Version, I2cError> {
         let bytes = self.read_bytes(protocol::REG_HARDWARE_VERSION, 4)?;
-        Ok(Version::from_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+        Ok(Version::from_bytes([
+            bytes[0], bytes[1], bytes[2], bytes[3],
+        ]))
     }
 
     /// Get firmware version as a `Version` struct
@@ -199,7 +201,9 @@ impl HalpiDevice {
     /// Returns `I2cError` if the version cannot be read from the device.
     pub fn get_firmware_version(&mut self) -> Result<Version, I2cError> {
         let bytes = self.read_bytes(protocol::REG_FIRMWARE_VERSION, 4)?;
-        Ok(Version::from_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+        Ok(Version::from_bytes([
+            bytes[0], bytes[1], bytes[2], bytes[3],
+        ]))
     }
 
     /// Get device unique ID as a hexadecimal string
@@ -220,9 +224,7 @@ impl HalpiDevice {
     /// Returns `I2cError` if the state cannot be read or is invalid.
     pub fn get_power_state(&mut self) -> Result<PowerState, I2cError> {
         let state_byte = self.read_byte(protocol::REG_STATE)?;
-        PowerState::from_byte(state_byte).ok_or(I2cError::InvalidState {
-            state: state_byte,
-        })
+        PowerState::from_byte(state_byte).ok_or(I2cError::InvalidState { state: state_byte })
     }
 
     /// Get all measurements (analog values + state)
@@ -237,12 +239,12 @@ impl HalpiDevice {
         let supercap_voltage =
             self.read_analog_word(protocol::REG_SUPERCAP_VOLTAGE, protocol::VCAP_MAX)?;
         let input_current = self.read_analog_word(protocol::REG_INPUT_CURRENT, protocol::I_MAX)?;
-        let mcu_temperature =
-            self.read_analog_word(protocol::REG_MCU_TEMPERATURE, protocol::TEMP_RANGE_KELVIN)?
-                + protocol::TEMP_MIN_KELVIN;
-        let pcb_temperature =
-            self.read_analog_word(protocol::REG_PCB_TEMPERATURE, protocol::TEMP_RANGE_KELVIN)?
-                + protocol::TEMP_MIN_KELVIN;
+        let mcu_temperature = self
+            .read_analog_word(protocol::REG_MCU_TEMPERATURE, protocol::TEMP_RANGE_KELVIN)?
+            + protocol::TEMP_MIN_KELVIN;
+        let pcb_temperature = self
+            .read_analog_word(protocol::REG_PCB_TEMPERATURE, protocol::TEMP_RANGE_KELVIN)?
+            + protocol::TEMP_MIN_KELVIN;
 
         // Read power state
         let power_state = self.get_power_state()?;

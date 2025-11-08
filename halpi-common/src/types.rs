@@ -224,18 +224,9 @@ mod tests {
 
     #[test]
     fn test_power_state_from_byte() {
-        assert_eq!(
-            PowerState::from_byte(0),
-            Some(PowerState::PowerOff)
-        );
-        assert_eq!(
-            PowerState::from_byte(3),
-            Some(PowerState::OperationalSolo)
-        );
-        assert_eq!(
-            PowerState::from_byte(13),
-            Some(PowerState::Standby)
-        );
+        assert_eq!(PowerState::from_byte(0), Some(PowerState::PowerOff));
+        assert_eq!(PowerState::from_byte(3), Some(PowerState::OperationalSolo));
+        assert_eq!(PowerState::from_byte(13), Some(PowerState::Standby));
         assert_eq!(PowerState::from_byte(99), None);
     }
 
