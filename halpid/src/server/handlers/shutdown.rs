@@ -47,10 +47,16 @@ pub async fn post_standby(
     let wakeup_timestamp = match payload {
         StandbyRequest::Delay { delay } => {
             // Current time + delay
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = match SystemTime::now().duration_since(UNIX_EPOCH) {
+                Ok(duration) => duration.as_secs(),
+                Err(e) => {
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({"error": format!("System time is before Unix epoch: {}", e)})),
+                    )
+                        .into_response();
+                }
+            };
             now + delay as u64
         }
         StandbyRequest::Datetime { datetime } => {
@@ -116,11 +122,14 @@ fn parse_datetime(datetime: &str) -> Result<u64, String> {
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(datetime) {
         Ok(dt.timestamp() as u64)
     } else if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(datetime, "%Y-%m-%d %H:%M:%S") {
-        // Assume local timezone
-        let local_offset = *chrono::Local::now().offset();
-        let dt_with_tz =
-            chrono::DateTime::<chrono::Local>::from_naive_utc_and_offset(dt, local_offset);
-        Ok(dt_with_tz.timestamp() as u64)
+        // Interpret as local timezone
+        match chrono::Local.from_local_datetime(&dt) {
+            chrono::LocalResult::Single(dt_with_tz) => Ok(dt_with_tz.timestamp() as u64),
+            _ => Err(format!(
+                "Could not interpret datetime '{}' as local time",
+                datetime
+            )),
+        }
     } else {
         Err(format!(
             "Could not parse datetime: {}. Expected ISO 8601 format (e.g., '2025-11-08T12:00:00Z' or '2025-11-08 12:00:00')",

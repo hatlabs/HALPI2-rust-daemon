@@ -58,6 +58,8 @@ pub async fn get_usb(State(state): State<AppState>, Path(port): Path<u8>) -> Res
 }
 
 /// PUT /usb - Set all USB port states
+///
+/// Only updates the ports specified in the payload. Unspecified ports retain their current state.
 #[cfg(target_os = "linux")]
 pub async fn put_all_usb(
     State(state): State<AppState>,
@@ -69,22 +71,50 @@ pub async fn put_all_usb(
     let usb2 = payload.get("usb2").and_then(|v| v.as_bool());
     let usb3 = payload.get("usb3").and_then(|v| v.as_bool());
 
-    // Build bitfield
-    let mut port_bits: u8 = 0;
-    if let Some(true) = usb0 {
-        port_bits |= 0x01;
-    }
-    if let Some(true) = usb1 {
-        port_bits |= 0x02;
-    }
-    if let Some(true) = usb2 {
-        port_bits |= 0x04;
-    }
-    if let Some(true) = usb3 {
-        port_bits |= 0x08;
-    }
-
     let mut device = state.device.lock().await;
+
+    // Read current port state
+    let current_bits = match device.get_usb_port_state() {
+        Ok(bits) => bits,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("Failed to get current USB port states: {}", e)})),
+            )
+                .into_response();
+        }
+    };
+
+    // Update only specified fields
+    let mut port_bits = current_bits;
+    if let Some(val) = usb0 {
+        if val {
+            port_bits |= 0x01;
+        } else {
+            port_bits &= !0x01;
+        }
+    }
+    if let Some(val) = usb1 {
+        if val {
+            port_bits |= 0x02;
+        } else {
+            port_bits &= !0x02;
+        }
+    }
+    if let Some(val) = usb2 {
+        if val {
+            port_bits |= 0x04;
+        } else {
+            port_bits &= !0x04;
+        }
+    }
+    if let Some(val) = usb3 {
+        if val {
+            port_bits |= 0x08;
+        } else {
+            port_bits &= !0x08;
+        }
+    }
 
     match device.set_usb_port_state(port_bits) {
         Ok(()) => (StatusCode::NO_CONTENT, ()).into_response(),
