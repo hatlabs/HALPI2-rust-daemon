@@ -28,13 +28,50 @@ pub struct AppState {
 impl AppState {
     /// Create new application state
     #[cfg(target_os = "linux")]
-    pub fn new(device: HalpiDevice, config: Config) -> Self {
+    pub fn new(device: Arc<Mutex<HalpiDevice>>, config: Arc<RwLock<Config>>) -> Self {
         Self {
-            device: Arc::new(Mutex::new(device)),
-            config: Arc::new(RwLock::new(config)),
+            device,
+            config,
             version: env!("CARGO_PKG_VERSION"),
         }
     }
+}
+
+/// Run the HTTP server on a Unix socket
+#[cfg(target_os = "linux")]
+pub async fn run_server(state: AppState) -> anyhow::Result<()> {
+    use std::path::PathBuf;
+    use tokio::net::UnixListener;
+
+    let socket_path = {
+        let config = state.config.read().await;
+        config
+            .socket
+            .clone()
+            .unwrap_or_else(|| PathBuf::from("/run/halpid/halpid.sock"))
+    };
+
+    // Remove existing socket if it exists
+    if socket_path.exists() {
+        std::fs::remove_file(&socket_path)?;
+    }
+
+    // Create parent directory if it doesn't exist
+    if let Some(parent) = socket_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let listener = UnixListener::bind(&socket_path)?;
+
+    tracing::info!("HTTP server listening on {}", socket_path.display());
+
+    let app = create_app(state);
+
+    axum::serve(listener, app.into_make_service())
+        .await
+        .map_err(|e| anyhow::anyhow!("Server error: {}", e))?;
+
+    Ok(())
 }
 
 /// Create the Axum application with all routes and middleware
@@ -158,10 +195,10 @@ mod tests {
     fn test_app_state_creation() {
         // Skip test if I2C hardware not available
         let device = match HalpiDevice::new(1, 0x6D) {
-            Ok(d) => d,
+            Ok(d) => Arc::new(Mutex::new(d)),
             Err(_) => return,
         };
-        let config = Config::default();
+        let config = Arc::new(RwLock::new(Config::default()));
         let state = AppState::new(device, config);
 
         assert_eq!(state.version, env!("CARGO_PKG_VERSION"));
@@ -171,10 +208,10 @@ mod tests {
     fn test_create_app() {
         // Skip test if I2C hardware not available
         let device = match HalpiDevice::new(1, 0x6D) {
-            Ok(d) => d,
+            Ok(d) => Arc::new(Mutex::new(d)),
             Err(_) => return,
         };
-        let config = Config::default();
+        let config = Arc::new(RwLock::new(Config::default()));
         let state = AppState::new(device, config);
 
         let _app = create_app(state);

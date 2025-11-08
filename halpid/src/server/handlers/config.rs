@@ -77,14 +77,16 @@ mod tests {
     use super::*;
     use crate::i2c::device::HalpiDevice;
     use halpi_common::config::Config;
+    use std::sync::Arc;
+    use tokio::sync::{Mutex, RwLock};
 
     #[tokio::test]
     async fn test_get_all_config() {
         let device = match HalpiDevice::new(1, 0x6D) {
-            Ok(d) => d,
+            Ok(d) => Arc::new(Mutex::new(d)),
             Err(_) => return,
         };
-        let config = Config::default();
+        let config = Arc::new(RwLock::new(Config::default()));
         let state = AppState::new(device, config);
 
         let response = get_all_config(State(state)).await;
@@ -94,10 +96,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_config_valid_key() {
         let device = match HalpiDevice::new(1, 0x6D) {
-            Ok(d) => d,
+            Ok(d) => Arc::new(Mutex::new(d)),
             Err(_) => return,
         };
-        let config = Config::default();
+        let config = Arc::new(RwLock::new(Config::default()));
         let state = AppState::new(device, config);
 
         let response = get_config(State(state), Path("i2c_bus".to_string())).await;
@@ -107,10 +109,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_config_invalid_key() {
         let device = match HalpiDevice::new(1, 0x6D) {
-            Ok(d) => d,
+            Ok(d) => Arc::new(Mutex::new(d)),
             Err(_) => return,
         };
-        let config = Config::default();
+        let config = Arc::new(RwLock::new(Config::default()));
         let state = AppState::new(device, config);
 
         let response = get_config(State(state), Path("invalid_key".to_string())).await;
