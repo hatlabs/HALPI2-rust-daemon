@@ -39,7 +39,7 @@ impl AppState {
 
 /// Create the Axum application with all routes and middleware
 pub fn create_app(state: AppState) -> Router {
-    use super::handlers::{health, values};
+    use super::handlers::{config, flash, health, shutdown, usb, values};
 
     Router::new()
         // Health and version endpoints
@@ -48,6 +48,26 @@ pub fn create_app(state: AppState) -> Router {
         // Values endpoints
         .route("/values", axum::routing::get(values::get_all_values))
         .route("/values/:key", axum::routing::get(values::get_value))
+        // Configuration endpoints
+        .route("/config", axum::routing::get(config::get_all_config))
+        .route(
+            "/config/:key",
+            axum::routing::get(config::get_config).put(config::put_config),
+        )
+        // Shutdown and standby endpoints
+        .route("/shutdown", axum::routing::post(shutdown::post_shutdown))
+        .route("/standby", axum::routing::post(shutdown::post_standby))
+        // USB port control endpoints
+        .route(
+            "/usb",
+            axum::routing::get(usb::get_all_usb).put(usb::put_all_usb),
+        )
+        .route(
+            "/usb/:port",
+            axum::routing::get(usb::get_usb).put(usb::put_usb),
+        )
+        // Firmware upload endpoint
+        .route("/flash", axum::routing::post(flash::post_flash))
         // Add tracing middleware
         .layer(TraceLayer::new_for_http())
         // Add shared state

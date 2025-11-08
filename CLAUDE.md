@@ -65,15 +65,44 @@ Use the `./run` script for all development tasks:
 **IMPORTANT**: Before every commit, run these commands locally to catch issues before CI:
 
 ```bash
-cargo fmt && cargo clippy --all-targets -- -D warnings && cargo test
+cargo fmt && cargo clippy --all-targets -- -D warnings && cargo test --verbose
 ```
 
 This ensures:
-1. **Formatting** - Code is formatted according to rustfmt standards (CI runs `cargo fmt --check`)
+1. **Formatting** - Code is formatted according to rustfmt standards (CI runs `cargo fmt --all -- --check`)
 2. **Linting** - No clippy warnings (CI runs with `-D warnings` which treats warnings as errors)
-3. **Tests** - All tests pass
+3. **Tests** - All tests pass (use `--verbose` to match CI output)
 
 **Why this matters**: The CI enforces these checks with `-D warnings`, meaning any warning becomes a build failure. Running locally first saves CI cycles and iteration time.
+
+### CI Workflow Matches
+
+The CI workflow (`.github/workflows/build.yml`) runs three jobs:
+
+1. **Check job**:
+   - `cargo check --all-targets --verbose`
+   - `cargo clippy --all-targets -- -D warnings`
+   - `cargo fmt --all -- --check`
+
+2. **Test job**:
+   - `cargo test --verbose`
+
+3. **Build job** (matrix: x86_64-unknown-linux-gnu, aarch64-unknown-linux-musl):
+   - `cargo build --release --target $TARGET`
+
+**Common pitfalls**:
+- **Trait imports**: Always explicitly import traits needed for method calls (e.g., `use chrono::TimeZone`). macOS and Linux environments may have different implicit imports.
+- **Platform differences**: Tests that skip on macOS (no I2C hardware) must also handle Linux CI (no I2C hardware). Use `match HalpiDevice::new() { Ok(d) => d, Err(_) => return }` pattern.
+- **Verbose output**: Use `cargo test --verbose` to match CI output format and catch edge cases.
+
+To run the exact same checks as CI locally:
+```bash
+# Run all CI checks sequentially
+cargo check --all-targets --verbose && \
+cargo clippy --all-targets -- -D warnings && \
+cargo fmt --all -- --check && \
+cargo test --verbose
+```
 
 ## Architecture Overview
 
