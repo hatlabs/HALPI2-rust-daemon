@@ -78,16 +78,13 @@ async fn main() {
         }
         Some(Commands::Shutdown { standby, time }) => {
             if standby {
-                if let Some(t) = time {
-                    // Try to parse as integer (seconds), otherwise treat as datetime
-                    if let Ok(delay) = t.parse::<u32>() {
-                        commands::shutdown::standby_delay(delay).await
-                    } else {
-                        commands::shutdown::standby_datetime(&t).await
-                    }
+                // Clap enforces that time is present when standby is true (via requires attribute)
+                let t = time.unwrap();
+                // Try to parse as integer (seconds), otherwise treat as datetime
+                if let Ok(delay) = t.parse::<u32>() {
+                    commands::shutdown::standby_delay(delay).await
                 } else {
-                    eprintln!("Error: --time is required when using --standby");
-                    std::process::exit(1);
+                    commands::shutdown::standby_datetime(&t).await
                 }
             } else {
                 commands::shutdown::shutdown().await

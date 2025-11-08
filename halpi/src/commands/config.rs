@@ -43,8 +43,7 @@ fn format_value(value: &Value) -> String {
         Value::Number(n) => {
             if let Some(f) = n.as_f64() {
                 // Format floats with up to 2 decimal places, strip trailing zeros
-                let formatted = format!("{:.2}", f);
-                formatted
+                format!("{:.2}", f)
                     .trim_end_matches('0')
                     .trim_end_matches('.')
                     .to_string()

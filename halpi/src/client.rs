@@ -146,6 +146,9 @@ impl HalpiClient {
     }
 
     /// Get a specific value by key
+    ///
+    /// This method is currently unused, but is retained for potential future API expansion
+    /// where fetching individual values by key may be required.
     #[allow(dead_code)]
     pub async fn get_value(&self, key: &str) -> Result<Value> {
         #[cfg(unix)]
