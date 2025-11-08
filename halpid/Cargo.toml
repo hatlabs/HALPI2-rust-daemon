@@ -21,6 +21,7 @@ serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 i2cdev.workspace = true
+crc32fast.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
