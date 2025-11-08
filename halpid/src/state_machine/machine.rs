@@ -103,6 +103,7 @@ impl StateMachine {
                 let mut device = self.device.lock().await;
                 device.set_watchdog_timeout(WATCHDOG_TIMEOUT_MS)?;
                 drop(device);
+                drop(config);
 
                 self.transition_to(DaemonState::Ok);
             }
@@ -121,12 +122,13 @@ impl StateMachine {
                         v_in, config.blackout_voltage_limit
                     );
                     self.blackout_start = Some(Instant::now());
+                    drop(config);
                     self.transition_to(DaemonState::Blackout);
+                } else {
+                    // Feed watchdog in normal operation
+                    let mut device = self.device.lock().await;
+                    device.feed_watchdog()?;
                 }
-
-                // Feed watchdog in normal operation
-                let mut device = self.device.lock().await;
-                device.feed_watchdog()?;
             }
 
             DaemonState::Blackout => {
@@ -140,13 +142,16 @@ impl StateMachine {
                 if v_in > config.blackout_voltage_limit as f32 {
                     info!("Power resumed (V_in = {:.2}V)", v_in);
                     self.blackout_start = None;
+                    drop(config);
                     self.transition_to(DaemonState::Ok);
                 } else if let Some(start) = self.blackout_start {
                     // Check timeout
                     let elapsed = start.elapsed().as_secs_f64();
                     if elapsed > config.blackout_time_limit {
                         warn!("Blacked out for {:.1}s, initiating shutdown", elapsed);
+                        drop(config);
                         self.transition_to(DaemonState::Shutdown);
+                        return Ok(());
                     }
                 }
 
@@ -172,6 +177,7 @@ impl StateMachine {
                 } else {
                     warn!("Dry-run mode: poweroff command is empty");
                 }
+                drop(config);
 
                 self.transition_to(DaemonState::Dead);
             }
