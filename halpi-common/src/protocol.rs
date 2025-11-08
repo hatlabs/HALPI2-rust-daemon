@@ -18,11 +18,14 @@ pub const REG_HARDWARE_VERSION: u8 = 0x03;
 /// Firmware version (4 bytes: major.minor.patch-alpha)
 pub const REG_FIRMWARE_VERSION: u8 = 0x04;
 
-/// Power control/status register
-pub const REG_POWER_CONTROL: u8 = 0x10;
+/// 5V output enable state (byte, boolean)
+pub const REG_EN5V_STATE: u8 = 0x10;
 
 /// Watchdog timeout (word, milliseconds)
-pub const REG_WATCHDOG_TIMEOUT: u8 = 0x12;
+pub const REG_WATCHDOG_TIMEOUT: u8 = 0x11;
+
+/// Watchdog feed command (write any byte)
+pub const REG_WATCHDOG_FEED: u8 = 0x12;
 
 /// Power-on threshold (word, analog scaled)
 pub const REG_POWER_ON_THRESHOLD: u8 = 0x13;
@@ -31,7 +34,7 @@ pub const REG_POWER_ON_THRESHOLD: u8 = 0x13;
 pub const REG_SOLO_POWEROFF_THRESHOLD: u8 = 0x14;
 
 /// Current power state (byte, PowerState enum)
-pub const REG_POWER_STATE: u8 = 0x15;
+pub const REG_STATE: u8 = 0x15;
 
 /// Watchdog elapsed time (byte, 0.1s units)
 pub const REG_WATCHDOG_ELAPSED: u8 = 0x16;
@@ -44,6 +47,9 @@ pub const REG_AUTO_RESTART: u8 = 0x18;
 
 /// Solo depleting timeout (4 bytes, big-endian u32, milliseconds)
 pub const REG_SOLO_DEPLETING_TIMEOUT: u8 = 0x19;
+
+/// USB port enable state (byte, bitfield for 4 ports)
+pub const REG_USB_PORT_STATE: u8 = 0x1A;
 
 /// DC input voltage (word, analog scaled)
 pub const REG_DCIN_VOLTAGE: u8 = 0x20;
@@ -60,6 +66,9 @@ pub const REG_MCU_TEMPERATURE: u8 = 0x23;
 /// PCB temperature (word, analog scaled, Kelvin)
 pub const REG_PCB_TEMPERATURE: u8 = 0x24;
 
+/// Device unique ID (8 bytes)
+pub const REG_DEVICE_ID: u8 = 0x25;
+
 /// Request shutdown command (write byte)
 pub const REG_REQUEST_SHUTDOWN: u8 = 0x30;
 
@@ -69,20 +78,20 @@ pub const REG_REQUEST_STANDBY: u8 = 0x31;
 /// Start firmware update (write 4 bytes: big-endian u32 total size)
 pub const REG_DFU_START: u8 = 0x40;
 
-/// Upload firmware block (write block_num + crc + data)
-pub const REG_DFU_UPLOAD_BLOCK: u8 = 0x41;
+/// Get DFU status
+pub const REG_DFU_STATUS: u8 = 0x41;
+
+/// Get DFU blocks written count (word)
+pub const REG_DFU_BLOCKS_WRITTEN: u8 = 0x42;
+
+/// Upload firmware block (write CRC + block_num + block_len + data)
+pub const REG_DFU_UPLOAD_BLOCK: u8 = 0x43;
 
 /// Commit firmware update
-pub const REG_DFU_COMMIT: u8 = 0x42;
+pub const REG_DFU_COMMIT: u8 = 0x44;
 
 /// Abort firmware update
-pub const REG_DFU_ABORT: u8 = 0x43;
-
-/// Get DFU status
-pub const REG_DFU_STATUS: u8 = 0x44;
-
-/// Get DFU error details
-pub const REG_DFU_ERROR: u8 = 0x45;
+pub const REG_DFU_ABORT: u8 = 0x45;
 
 // ============================================================================
 // Power State Enum
@@ -286,8 +295,8 @@ pub fn decode_u32(bytes: &[u8]) -> Result<u32, ProtocolError> {
 ///
 /// # Returns
 /// Scaled float value (e.g., voltage in volts)
-pub fn analog_word_to_float(raw: u16, scale: f64) -> f64 {
-    scale * (raw as f64) / 65536.0
+pub fn analog_word_to_float(raw: u16, scale: f32) -> f32 {
+    scale * (raw as f32) / 65536.0
 }
 
 /// Convert a float value to a 16-bit analog value
@@ -298,17 +307,17 @@ pub fn analog_word_to_float(raw: u16, scale: f64) -> f64 {
 ///
 /// # Returns
 /// 16-bit raw value for I2C register
-pub fn float_to_analog_word(value: f64, scale: f64) -> u16 {
+pub fn float_to_analog_word(value: f32, scale: f32) -> u16 {
     ((65536.0 * value) / scale) as u16
 }
 
 /// Convert a byte analog reading to a float value (legacy, for firmware v2.x)
-pub fn analog_byte_to_float(raw: u8, scale: f64) -> f64 {
-    scale * (raw as f64) / 256.0
+pub fn analog_byte_to_float(raw: u8, scale: f32) -> f32 {
+    scale * (raw as f32) / 256.0
 }
 
 /// Convert a float value to a byte analog value (legacy, for firmware v2.x)
-pub fn float_to_analog_byte(value: f64, scale: f64) -> u8 {
+pub fn float_to_analog_byte(value: f32, scale: f32) -> u8 {
     ((256.0 * value) / scale) as u8
 }
 
@@ -317,30 +326,30 @@ pub fn float_to_analog_byte(value: f64, scale: f64) -> u8 {
 // ============================================================================
 
 /// Maximum supercapacitor voltage (11V)
-pub const VCAP_MAX: f64 = 11.0;
+pub const VCAP_MAX: f32 = 11.0;
 
 /// Maximum DC input voltage (40V)
-pub const DCIN_MAX: f64 = 40.0;
+pub const DCIN_MAX: f32 = 40.0;
 
 /// Maximum input current (3.3A)
-pub const I_MAX: f64 = 3.3;
+pub const I_MAX: f32 = 3.3;
 
 /// Minimum temperature in Kelvin (-40°C)
-pub const TEMP_MIN_KELVIN: f64 = 273.15 - 40.0;
+pub const TEMP_MIN_KELVIN: f32 = 273.15 - 40.0;
 
 /// Maximum temperature in Kelvin (+100°C)
-pub const TEMP_MAX_KELVIN: f64 = 273.15 + 100.0;
+pub const TEMP_MAX_KELVIN: f32 = 273.15 + 100.0;
 
 /// Temperature range (TEMP_MAX_KELVIN - TEMP_MIN_KELVIN)
-pub const TEMP_RANGE_KELVIN: f64 = TEMP_MAX_KELVIN - TEMP_MIN_KELVIN;
+pub const TEMP_RANGE_KELVIN: f32 = TEMP_MAX_KELVIN - TEMP_MIN_KELVIN;
 
 /// Convert Kelvin to Celsius
-pub fn kelvin_to_celsius(kelvin: f64) -> f64 {
+pub fn kelvin_to_celsius(kelvin: f32) -> f32 {
     kelvin - 273.15
 }
 
 /// Convert Celsius to Kelvin
-pub fn celsius_to_kelvin(celsius: f64) -> f64 {
+pub fn celsius_to_kelvin(celsius: f32) -> f32 {
     celsius + 273.15
 }
 
