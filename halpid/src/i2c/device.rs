@@ -301,7 +301,7 @@ impl HalpiDevice {
     /// Returns `I2cError` if the threshold cannot be written.
     pub fn set_solo_power_off_threshold(&mut self, volts: f32) -> Result<(), I2cError> {
         self.write_analog_word(
-            protocol::REG_SOLO_POWER_OFF_THRESHOLD,
+            protocol::REG_SOLO_POWEROFF_THRESHOLD,
             volts,
             protocol::VCAP_MAX,
         )
