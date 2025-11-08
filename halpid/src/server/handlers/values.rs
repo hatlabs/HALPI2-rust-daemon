@@ -12,22 +12,6 @@ use serde_json::json;
 
 use crate::server::app::AppState;
 
-/// Format a device ID as a hex string
-#[cfg(target_os = "linux")]
-fn format_device_id(device_id: [u8; 8]) -> String {
-    format!(
-        "{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-        device_id[0],
-        device_id[1],
-        device_id[2],
-        device_id[3],
-        device_id[4],
-        device_id[5],
-        device_id[6],
-        device_id[7]
-    )
-}
-
 /// GET /values - Get all sensor readings and device information
 #[cfg(target_os = "linux")]
 pub async fn get_all_values(State(state): State<AppState>) -> Response {
@@ -55,7 +39,9 @@ pub async fn get_all_values(State(state): State<AppState>) -> Response {
         .unwrap_or_else(|_| halpi_common::types::Version::from_bytes([255, 0, 0, 0]));
 
     // Read device ID
-    let device_id = device.get_device_id().unwrap_or([0; 8]);
+    let device_id = device
+        .get_device_id()
+        .unwrap_or_else(|_| "0000000000000000".to_string());
 
     // Release lock
     drop(device);
@@ -65,7 +51,7 @@ pub async fn get_all_values(State(state): State<AppState>) -> Response {
         "daemon_version": state.version,
         "hardware_version": hardware_version.to_string(),
         "firmware_version": firmware_version.to_string(),
-        "device_id": format_device_id(device_id),
+        "device_id": device_id,
         "V_in": measurements.dcin_voltage,
         "V_cap": measurements.supercap_voltage,
         "I_in": measurements.input_current,
@@ -111,8 +97,8 @@ pub async fn get_value(State(state): State<AppState>, Path(key): Path<String>) -
                     }),
                 "device_id" => device
                     .get_device_id()
-                    .map(|id| json!(format_device_id(id)))
-                    .or_else(|_| Ok(json!(format_device_id([0; 8])))),
+                    .map(|id| json!(id))
+                    .or_else(|_| Ok(json!("0000000000000000"))),
                 "V_in" | "V_cap" | "I_in" | "T_mcu" | "T_pcb" | "state" | "watchdog_elapsed" => {
                     match device.get_measurements() {
                         Ok(m) => Ok(match key.as_str() {
