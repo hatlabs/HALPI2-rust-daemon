@@ -174,7 +174,7 @@ impl HalpiDevice {
         self.start_dfu(firmware.len() as u32)?;
 
         // Calculate total blocks
-        let total_blocks = (firmware.len() + FLASH_BLOCK_SIZE - 1) / FLASH_BLOCK_SIZE;
+        let total_blocks = firmware.len().div_ceil(FLASH_BLOCK_SIZE);
 
         // Upload each block
         for (block_num, chunk) in firmware.chunks(FLASH_BLOCK_SIZE).enumerate() {
