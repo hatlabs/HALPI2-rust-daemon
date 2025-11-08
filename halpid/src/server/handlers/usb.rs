@@ -223,14 +223,16 @@ mod tests {
     use super::*;
     use crate::i2c::device::HalpiDevice;
     use halpi_common::config::Config;
+    use std::sync::Arc;
+    use tokio::sync::{Mutex, RwLock};
 
     #[tokio::test]
     async fn test_get_all_usb() {
         let device = match HalpiDevice::new(1, 0x6D) {
-            Ok(d) => d,
+            Ok(d) => Arc::new(Mutex::new(d)),
             Err(_) => return,
         };
-        let config = Config::default();
+        let config = Arc::new(RwLock::new(Config::default()));
         let state = AppState::new(device, config);
 
         let response = get_all_usb(State(state)).await;
@@ -243,10 +245,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_usb_valid_port() {
         let device = match HalpiDevice::new(1, 0x6D) {
-            Ok(d) => d,
+            Ok(d) => Arc::new(Mutex::new(d)),
             Err(_) => return,
         };
-        let config = Config::default();
+        let config = Arc::new(RwLock::new(Config::default()));
         let state = AppState::new(device, config);
 
         let response = get_usb(State(state), Path(0)).await;
@@ -259,10 +261,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_usb_invalid_port() {
         let device = match HalpiDevice::new(1, 0x6D) {
-            Ok(d) => d,
+            Ok(d) => Arc::new(Mutex::new(d)),
             Err(_) => return,
         };
-        let config = Config::default();
+        let config = Arc::new(RwLock::new(Config::default()));
         let state = AppState::new(device, config);
 
         let response = get_usb(State(state), Path(4)).await;

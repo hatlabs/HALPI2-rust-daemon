@@ -41,13 +41,15 @@ mod tests {
     async fn test_version_endpoint() {
         use crate::i2c::device::HalpiDevice;
         use halpi_common::config::Config;
+        use std::sync::Arc;
+        use tokio::sync::{Mutex, RwLock};
 
         // Skip test if I2C hardware not available
         let device = match HalpiDevice::new(1, 0x6D) {
-            Ok(d) => d,
+            Ok(d) => Arc::new(Mutex::new(d)),
             Err(_) => return,
         };
-        let config = Config::default();
+        let config = Arc::new(RwLock::new(Config::default()));
         let state = AppState::new(device, config);
 
         let response = version(State(state)).await;

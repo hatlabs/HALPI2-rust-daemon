@@ -115,7 +115,7 @@ impl StateMachine {
                 };
 
                 // Check for blackout
-                if v_in < config.blackout_voltage_limit {
+                if v_in < config.blackout_voltage_limit as f32 {
                     warn!(
                         "Detected blackout (V_in = {:.2}V < {:.2}V)",
                         v_in, config.blackout_voltage_limit
@@ -137,7 +137,7 @@ impl StateMachine {
                 };
 
                 // Check for power restoration
-                if v_in > config.blackout_voltage_limit {
+                if v_in > config.blackout_voltage_limit as f32 {
                     info!("Power resumed (V_in = {:.2}V)", v_in);
                     self.blackout_start = None;
                     self.transition_to(DaemonState::Ok);

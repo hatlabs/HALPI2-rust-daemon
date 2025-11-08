@@ -176,15 +176,17 @@ mod tests {
     use super::*;
     use crate::i2c::device::HalpiDevice;
     use halpi_common::config::Config;
+    use std::sync::Arc;
+    use tokio::sync::{Mutex, RwLock};
 
     #[tokio::test]
     async fn test_get_all_values_structure() {
         // Skip test if I2C hardware not available
         let device = match HalpiDevice::new(1, 0x6D) {
-            Ok(d) => d,
+            Ok(d) => Arc::new(Mutex::new(d)),
             Err(_) => return,
         };
-        let config = Config::default();
+        let config = Arc::new(RwLock::new(Config::default()));
         let state = AppState::new(device, config);
 
         let response = get_all_values(State(state)).await;
@@ -199,10 +201,10 @@ mod tests {
     async fn test_get_value_unknown_key() {
         // Skip test if I2C hardware not available
         let device = match HalpiDevice::new(1, 0x6D) {
-            Ok(d) => d,
+            Ok(d) => Arc::new(Mutex::new(d)),
             Err(_) => return,
         };
-        let config = Config::default();
+        let config = Arc::new(RwLock::new(Config::default()));
         let state = AppState::new(device, config);
 
         let response = get_value(State(state), Path("invalid_key".to_string())).await;
