@@ -64,73 +64,89 @@ pub async fn get_all_values(State(state): State<AppState>) -> Response {
     (StatusCode::OK, Json(response_json)).into_response()
 }
 
+/// Helper function to check if a key requires device access
+#[cfg(target_os = "linux")]
+fn requires_device_access(key: &str) -> bool {
+    matches!(
+        key,
+        "hardware_version"
+            | "firmware_version"
+            | "device_id"
+            | "V_in"
+            | "V_cap"
+            | "I_in"
+            | "T_mcu"
+            | "T_pcb"
+            | "state"
+            | "watchdog_elapsed"
+    )
+}
+
 /// GET /values/:key - Get a specific value by key
 #[cfg(target_os = "linux")]
 pub async fn get_value(State(state): State<AppState>, Path(key): Path<String>) -> Response {
-    // Match the requested key and only lock device if needed
-    match key.as_str() {
-        "daemon_version" => {
-            let value = json!(state.version);
-            (StatusCode::OK, Json(value)).into_response()
-        }
-        "hardware_version" | "firmware_version" | "device_id" | "V_in" | "V_cap" | "I_in"
-        | "T_mcu" | "T_pcb" | "state" | "watchdog_elapsed" => {
-            let mut device = state.device.lock().await;
+    // Handle daemon_version without device access
+    if key == "daemon_version" {
+        let value = json!(state.version);
+        return (StatusCode::OK, Json(value)).into_response();
+    }
 
-            // Read only the data needed for the requested key
-            let value: Result<Value, String> = match key.as_str() {
-                "hardware_version" => device
-                    .get_hardware_version()
-                    .map(|v| json!(v.to_string()))
-                    .or_else(|_| {
-                        Ok(json!(
-                            halpi_common::types::Version::from_bytes([255, 0, 0, 0]).to_string()
-                        ))
-                    }),
-                "firmware_version" => device
-                    .get_firmware_version()
-                    .map(|v| json!(v.to_string()))
-                    .or_else(|_| {
-                        Ok(json!(
-                            halpi_common::types::Version::from_bytes([255, 0, 0, 0]).to_string()
-                        ))
-                    }),
-                "device_id" => device
-                    .get_device_id()
-                    .map(|id| json!(id))
-                    .or_else(|_| Ok(json!("0000000000000000"))),
-                "V_in" | "V_cap" | "I_in" | "T_mcu" | "T_pcb" | "state" | "watchdog_elapsed" => {
-                    match device.get_measurements() {
-                        Ok(m) => Ok(match key.as_str() {
-                            "V_in" => json!(m.dcin_voltage),
-                            "V_cap" => json!(m.supercap_voltage),
-                            "I_in" => json!(m.input_current),
-                            "T_mcu" => json!(kelvin_to_celsius(m.mcu_temperature)),
-                            "T_pcb" => json!(kelvin_to_celsius(m.pcb_temperature)),
-                            "state" => json!(m.power_state.name()),
-                            "watchdog_elapsed" => json!(m.watchdog_elapsed),
-                            _ => unreachable!(),
-                        }),
-                        Err(e) => Err(e.to_string()),
-                    }
-                }
-                _ => unreachable!(),
-            };
-
-            drop(device);
-
-            match value {
-                Ok(v) => (StatusCode::OK, Json(v)).into_response(),
-                Err(e) => {
-                    (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e}))).into_response()
-                }
-            }
-        }
-        _ => (
+    // Check if key is valid and requires device access
+    if !requires_device_access(&key) {
+        return (
             StatusCode::NOT_FOUND,
             Json(json!({"error": format!("Unknown key: {}", key)})),
         )
-            .into_response(),
+            .into_response();
+    }
+
+    // Lock device and read the requested value
+    let mut device = state.device.lock().await;
+
+    let value: Result<Value, String> = match key.as_str() {
+        "hardware_version" => device
+            .get_hardware_version()
+            .map(|v| json!(v.to_string()))
+            .or_else(|_| {
+                Ok(json!(
+                    halpi_common::types::Version::from_bytes([255, 0, 0, 0]).to_string()
+                ))
+            }),
+        "firmware_version" => device
+            .get_firmware_version()
+            .map(|v| json!(v.to_string()))
+            .or_else(|_| {
+                Ok(json!(
+                    halpi_common::types::Version::from_bytes([255, 0, 0, 0]).to_string()
+                ))
+            }),
+        "device_id" => device
+            .get_device_id()
+            .map(|id| json!(id))
+            .or_else(|_| Ok(json!("0000000000000000"))),
+        "V_in" | "V_cap" | "I_in" | "T_mcu" | "T_pcb" | "state" | "watchdog_elapsed" => {
+            match device.get_measurements() {
+                Ok(m) => Ok(match key.as_str() {
+                    "V_in" => json!(m.dcin_voltage),
+                    "V_cap" => json!(m.supercap_voltage),
+                    "I_in" => json!(m.input_current),
+                    "T_mcu" => json!(kelvin_to_celsius(m.mcu_temperature)),
+                    "T_pcb" => json!(kelvin_to_celsius(m.pcb_temperature)),
+                    "state" => json!(m.power_state.name()),
+                    "watchdog_elapsed" => json!(m.watchdog_elapsed),
+                    _ => unreachable!(),
+                }),
+                Err(e) => Err(e.to_string()),
+            }
+        }
+        _ => unreachable!(),
+    };
+
+    drop(device);
+
+    match value {
+        Ok(v) => (StatusCode::OK, Json(v)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e}))).into_response(),
     }
 }
 
