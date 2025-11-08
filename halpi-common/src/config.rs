@@ -146,7 +146,7 @@ impl Config {
         // Validate I2C bus (0-255, but realistically 0-10 on RPi)
         if self.i2c_bus > 10 {
             return Err(ConfigError::InvalidValue(format!(
-                "i2c_bus {} is unusually high (expected 0-10)",
+                "i2c-bus {} is unusually high (expected 0-10)",
                 self.i2c_bus
             )));
         }
@@ -166,7 +166,7 @@ impl Config {
         // Validate blackout voltage limit (typical range: 5-15V)
         if self.blackout_voltage_limit < 5.0 || self.blackout_voltage_limit > 15.0 {
             return Err(ConfigError::InvalidValue(format!(
-                "blackout_voltage_limit {} is out of range (expected 5.0-15.0 volts)",
+                "blackout-voltage-limit {} is out of range (expected 5.0-15.0 volts)",
                 self.blackout_voltage_limit
             )));
         }
