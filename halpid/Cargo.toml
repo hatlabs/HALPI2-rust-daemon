@@ -28,6 +28,7 @@ thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 chrono.workspace = true
+clap.workspace = true
 
 # Daemon-specific dependencies
 signal-hook = "0.3"
