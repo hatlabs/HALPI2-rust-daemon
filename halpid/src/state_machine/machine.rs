@@ -84,7 +84,7 @@ impl StateMachine {
             DaemonState::Start => {
                 info!("Initializing watchdog");
                 let mut device = self.device.lock().await;
-                device.set_watchdog_timeout(10.0)?;
+                device.set_watchdog_timeout(10000)?;
                 drop(device);
 
                 self.transition_to(DaemonState::Ok);

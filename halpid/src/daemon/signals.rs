@@ -58,7 +58,7 @@ pub async fn cleanup(device: Arc<Mutex<HalpiDevice>>, socket_path: &Path) {
     // Disable watchdog - CRITICAL for hardware safety
     {
         let mut dev = device.lock().await;
-        if let Err(e) = dev.set_watchdog_timeout(0.0) {
+        if let Err(e) = dev.set_watchdog_timeout(0) {
             warn!("Failed to disable watchdog during shutdown: {}", e);
         } else {
             info!("Watchdog disabled");
