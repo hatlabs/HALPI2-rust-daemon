@@ -17,6 +17,23 @@ use halpi_common::config::Config;
 #[cfg(target_os = "linux")]
 use crate::i2c::HalpiDevice;
 
+/// Watchdog timeout in milliseconds (10 seconds)
+///
+/// This timeout must be longer than the state machine polling interval (100ms)
+/// to ensure the watchdog is fed before timeout. The 10-second value provides
+/// sufficient margin for normal operation while being short enough to safely
+/// power down the system if the daemon becomes unresponsive.
+#[cfg(target_os = "linux")]
+const WATCHDOG_TIMEOUT_MS: u16 = 10000;
+
+/// State machine polling interval in milliseconds (100ms)
+///
+/// CRITICAL: This 0.1 second interval is essential for responsive power management.
+/// The tight polling loop ensures quick detection of blackout events and timely
+/// watchdog feeding.
+#[cfg(target_os = "linux")]
+const STATE_MACHINE_POLL_INTERVAL_MS: u64 = 100;
+
 /// Daemon state machine states
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DaemonState {
@@ -65,7 +82,7 @@ impl StateMachine {
         info!("Starting power management state machine");
 
         // Critical timing: 0.1 second polling interval
-        let mut ticker = interval(Duration::from_millis(100));
+        let mut ticker = interval(Duration::from_millis(STATE_MACHINE_POLL_INTERVAL_MS));
 
         loop {
             ticker.tick().await;
@@ -84,7 +101,7 @@ impl StateMachine {
             DaemonState::Start => {
                 info!("Initializing watchdog");
                 let mut device = self.device.lock().await;
-                device.set_watchdog_timeout(10000)?;
+                device.set_watchdog_timeout(WATCHDOG_TIMEOUT_MS)?;
                 drop(device);
 
                 self.transition_to(DaemonState::Ok);
@@ -147,7 +164,9 @@ impl StateMachine {
                 // Execute poweroff command
                 if !config.poweroff.is_empty() {
                     info!("Executing: {}", config.poweroff);
-                    std::process::Command::new("sudo")
+                    // Use shell to execute the command, matching Python implementation behavior
+                    std::process::Command::new("sh")
+                        .arg("-c")
                         .arg(&config.poweroff)
                         .spawn()?;
                 } else {
