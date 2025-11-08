@@ -16,7 +16,7 @@ use crate::server::app::AppState;
 #[cfg(target_os = "linux")]
 pub async fn get_all_values(State(state): State<AppState>) -> Response {
     // Acquire device lock and read all values at once to minimize lock time
-    let device = state.device.lock().await;
+    let mut device = state.device.lock().await;
 
     // Read all measurements
     let measurements = match device.get_measurements() {
@@ -75,7 +75,7 @@ pub async fn get_value(State(state): State<AppState>, Path(key): Path<String>) -
         }
         "hardware_version" | "firmware_version" | "device_id" | "V_in" | "V_cap" | "I_in"
         | "T_mcu" | "T_pcb" | "state" | "watchdog_elapsed" => {
-            let device = state.device.lock().await;
+            let mut device = state.device.lock().await;
 
             // Read only the data needed for the requested key
             let value: Result<Value, String> = match key.as_str() {
