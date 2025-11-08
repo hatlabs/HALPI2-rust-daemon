@@ -117,7 +117,7 @@ fn parse_datetime(datetime: &str) -> Result<u64, String> {
         Ok(dt.timestamp() as u64)
     } else if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(datetime, "%Y-%m-%d %H:%M:%S") {
         // Assume local timezone
-        let local_offset = chrono::Local::now().offset().clone();
+        let local_offset = *chrono::Local::now().offset();
         let dt_with_tz =
             chrono::DateTime::<chrono::Local>::from_naive_utc_and_offset(dt, local_offset);
         Ok(dt_with_tz.timestamp() as u64)

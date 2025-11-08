@@ -47,7 +47,7 @@ pub async fn post_flash(State(state): State<AppState>, mut multipart: Multipart)
     }
 
     // Upload firmware in 4KB blocks
-    let num_blocks = (firmware_data.len() + FLASH_BLOCK_SIZE - 1) / FLASH_BLOCK_SIZE;
+    let num_blocks = firmware_data.len().div_ceil(FLASH_BLOCK_SIZE);
 
     for block_num in 0..num_blocks {
         let start = block_num * FLASH_BLOCK_SIZE;
@@ -89,14 +89,14 @@ async fn extract_firmware(multipart: &mut Multipart) -> Result<Vec<u8>, String> 
         .await
         .map_err(|e| format!("Failed to read multipart field: {}", e))?
     {
-        if let Some(name) = field.name() {
-            if name == "firmware" {
-                let data = field
-                    .bytes()
-                    .await
-                    .map_err(|e| format!("Failed to read firmware data: {}", e))?;
-                return Ok(data.to_vec());
-            }
+        if let Some(name) = field.name()
+            && name == "firmware"
+        {
+            let data = field
+                .bytes()
+                .await
+                .map_err(|e| format!("Failed to read firmware data: {}", e))?;
+            return Ok(data.to_vec());
         }
     }
 
