@@ -1,0 +1,313 @@
+#!/usr/bin/env bash
+#
+# usage: ./run command [argument ...]
+#
+# Commands used during development / CI.
+# Also, executable documentation for project dev practices.
+#
+# See https://death.andgravity.com/run-sh
+# for an explanation of how it works and why it's useful.
+
+################################################################################
+# Core Development Commands
+
+function build {
+  #@ Build all workspace members (debug by default)
+  #@ Usage: build [--release]
+  #@ Category: Core Development
+  cargo build $@
+}
+
+function build:daemon {
+  #@ Build the halpid daemon
+  #@ Usage: build:daemon [--release]
+  #@ Category: Core Development
+  cargo build -p halpid $@
+}
+
+function build:cli {
+  #@ Build the halpi CLI
+  #@ Usage: build:cli [--release]
+  #@ Category: Core Development
+  cargo build -p halpi $@
+}
+
+function clean {
+  #@ Clean all build artifacts
+  #@ Category: Core Development
+  cargo clean $@
+}
+
+function check {
+  #@ Run cargo check and clippy
+  #@ Category: Core Development
+  cargo check --all-targets
+  cargo clippy --all-targets -- -D warnings
+}
+
+function fmt {
+  #@ Format code with rustfmt
+  #@ Category: Core Development
+  cargo fmt --all
+}
+
+function fmt:check {
+  #@ Check code formatting without making changes
+  #@ Category: Core Development
+  cargo fmt --all -- --check
+}
+
+################################################################################
+# Cross-Compilation Commands
+
+function build:cross {
+  #@ Build for ARM64 Linux using cross
+  #@ Usage: build:cross [--release]
+  #@ Category: Cross-Compilation
+  if ! command -v cross &> /dev/null; then
+    echo "Error: 'cross' not found. Run './run cross:setup' first."
+    exit 1
+  fi
+
+  cross build --target aarch64-unknown-linux-musl $@
+}
+
+function cross:setup {
+  #@ Install cross-compilation tools
+  #@ Category: Cross-Compilation
+  cargo install cross
+  echo "✅ cross installed successfully"
+}
+
+################################################################################
+# Testing Commands
+
+function test {
+  #@ Run all tests
+  #@ Category: Testing
+  cargo test $@
+}
+
+function test:unit {
+  #@ Run unit tests only
+  #@ Category: Testing
+  cargo test --lib $@
+}
+
+function test:integration {
+  #@ Run integration tests only
+  #@ Category: Testing
+  cargo test --test '*' $@
+}
+
+function test:coverage {
+  #@ Run tests with coverage (requires cargo-tarpaulin)
+  #@ Category: Testing
+  if ! command -v cargo-tarpaulin &> /dev/null; then
+    echo "Installing cargo-tarpaulin..."
+    cargo install cargo-tarpaulin
+  fi
+
+  cargo tarpaulin --out Html --output-dir target/coverage
+  echo "✅ Coverage report generated in target/coverage/"
+}
+
+################################################################################
+# Package Management Commands
+
+function package:deb {
+  #@ Build Debian package (native)
+  #@ Category: Package Management
+  echo "🏗️ Building Debian package..."
+
+  if ! command -v cargo-deb &> /dev/null; then
+    echo "Installing cargo-deb..."
+    cargo install cargo-deb
+  fi
+
+  cargo deb -p halpid
+  echo "✅ Debian package built successfully"
+}
+
+function package:deb:cross {
+  #@ Build Debian package for ARM64 using cross
+  #@ Category: Package Management
+  echo "🏗️ Building ARM64 Debian package..."
+
+  # First build release binary for ARM64
+  build:cross --release
+
+  # Then build package
+  if ! command -v cargo-deb &> /dev/null; then
+    echo "Installing cargo-deb..."
+    cargo install cargo-deb
+  fi
+
+  cargo deb -p halpid --target aarch64-unknown-linux-musl --no-build
+  echo "✅ ARM64 Debian package built successfully"
+}
+
+################################################################################
+# Development Utilities
+
+function dev:daemon {
+  #@ Run daemon in development mode
+  #@ Category: Development
+  cargo run -p halpid
+}
+
+function dev:clean:all {
+  #@ Deep clean (cargo + artifacts + packages)
+  #@ Category: Development
+  clean
+  rm -rf target/debian
+  rm -rf target/coverage
+  echo "✅ Deep clean complete"
+}
+
+function dev:version:bump {
+  #@ Bump version to specified version
+  #@ Usage: dev:version:bump <version>
+  #@ Category: Development
+  local new_version=$1
+
+  if [ -z "$new_version" ]; then
+    echo "Error: Version required. Usage: ./run dev:version:bump <version>"
+    exit 1
+  fi
+
+  echo "Bumping version to $new_version..."
+  # Portable sed in-place replacement (works on GNU and BSD)
+  sed "s/^version = \".*\"/version = \"$new_version\"/" Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+
+  echo "✅ Version bumped to $new_version in Cargo.toml"
+  echo "Run 'cargo update' to update Cargo.lock"
+}
+
+function dev:version:show {
+  #@ Show current version
+  #@ Category: Development
+  grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2
+}
+
+################################################################################
+# Release/Version Commands
+
+function release:version {
+  #@ Get current version
+  #@ Category: Release/Version
+  dev:version:show
+}
+
+function release:build {
+  #@ Build release artifacts for ARM64
+  #@ Category: Release/Version
+  echo "🏗️ Building release artifacts for ARM64..."
+  build:cross --release
+  echo "✅ Release artifacts built in target/aarch64-unknown-linux-musl/release/"
+}
+
+################################################################################
+# CI/CD Commands
+
+function ci:check {
+  #@ Run CI verification checks
+  #@ Category: CI/CD
+  echo "🔍 Running CI checks..."
+  check
+  fmt:check
+  test
+  echo "✅ All CI checks passed"
+}
+
+function ci:build {
+  #@ Full CI build pipeline
+  #@ Category: CI/CD
+  echo "🚀 Running full CI build pipeline..."
+  ci:check
+  build --release
+  echo "✅ CI build complete"
+}
+
+################################################################################
+# Help System
+
+function help {
+  #@ Show this help message
+  #@ Category: Help
+  echo "HALPI2 Rust Daemon Development Commands"
+  echo
+  echo "Usage: ./run <command> [arguments]"
+  echo
+
+  # Extract categories and commands
+  declare -A categories
+  while IFS= read -r line; do
+    if [[ $line =~ ^function\ ([a-zA-Z0-9_:]+) ]]; then
+      func_name="${BASH_REMATCH[1]}"
+
+      # Read the next lines for documentation
+      desc=""
+      usage=""
+      category="General"
+
+      while IFS= read -r doc_line; do
+        if [[ $doc_line =~ ^[[:space:]]*#@[[:space:]]+(.*) ]]; then
+          content="${BASH_REMATCH[1]}"
+          if [[ $content =~ ^Usage:[[:space:]]+(.*) ]]; then
+            usage="${BASH_REMATCH[1]}"
+          elif [[ $content =~ ^Category:[[:space:]]+(.*) ]]; then
+            category="${BASH_REMATCH[1]}"
+          else
+            desc="$content"
+          fi
+        else
+          break
+        fi
+      done
+
+      # Store command in category
+      if [ -n "$desc" ]; then
+        cmd_info="  $func_name"
+        [ -n "$usage" ] && cmd_info="$cmd_info [$usage]"
+        cmd_info="$cmd_info - $desc"
+        categories[$category]+="$cmd_info"$'\n'
+      fi
+    fi
+  done < "$0"
+
+  # Print categories in order
+  for category in "Core Development" "Cross-Compilation" "Testing" "Package Management" "Development" "Release/Version" "CI/CD" "Help"; do
+    if [ -n "${categories[$category]}" ]; then
+      echo "$category:"
+      echo "${categories[$category]}"
+    fi
+  done
+}
+
+################################################################################
+# Main dispatcher
+
+# If no arguments provided, show help
+if [ $# -eq 0 ]; then
+  help
+  exit 0
+fi
+
+# Get the command name
+cmd=$1
+shift
+
+# Replace - with : for command names (allows both ./run build:daemon and ./run build-daemon)
+cmd=${cmd//-/:}
+
+# Check if function exists
+if declare -f "$cmd" > /dev/null; then
+  # Run the command
+  "$cmd" "$@"
+else
+  echo "Error: Unknown command '$cmd'"
+  echo
+  echo "Run './run help' to see available commands"
+  exit 1
+fi

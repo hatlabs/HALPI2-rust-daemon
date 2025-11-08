@@ -1,0 +1,19 @@
+[package]
+name = "halpi-common"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Shared types and utilities for HALPI2 daemon and CLI"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lib]
+name = "halpi_common"
+path = "src/lib.rs"
