@@ -55,6 +55,7 @@ pub fn create_app(state: AppState) -> Router {
 }
 
 /// Set Unix socket permissions and group ownership
+#[cfg(unix)]
 pub async fn setup_socket_permissions(
     socket_path: &Path,
     group_name: &str,
@@ -77,6 +78,7 @@ pub async fn setup_socket_permissions(
 }
 
 /// Set the group ownership of the socket file
+#[cfg(unix)]
 fn set_socket_group(socket_path: &Path, group_name: &str) -> Result<(), AppError> {
     use std::ffi::CString;
 
@@ -100,12 +102,19 @@ fn set_socket_group(socket_path: &Path, group_name: &str) -> Result<(), AppError
     // Get current user ID (don't change ownership)
     let uid = unsafe { libc::getuid() };
 
-    // Change ownership
-    let path_c = CString::new(socket_path.to_str().unwrap()).map_err(|_| {
-        ServerError::ChangeGroupFailed {
+    // Change ownership - handle invalid UTF-8 in path
+    let path_str = socket_path
+        .to_str()
+        .ok_or_else(|| ServerError::ChangeGroupFailed {
             group: group_name.to_string(),
-            source: std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid path"),
-        }
+            source: std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "socket path is not valid UTF-8",
+            ),
+        })?;
+    let path_c = CString::new(path_str).map_err(|_| ServerError::ChangeGroupFailed {
+        group: group_name.to_string(),
+        source: std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid path"),
     })?;
 
     let result = unsafe { libc::chown(path_c.as_ptr(), uid, gid) };

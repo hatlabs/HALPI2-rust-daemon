@@ -12,6 +12,22 @@ use serde_json::json;
 
 use crate::server::app::AppState;
 
+/// Format a device ID as a hex string
+#[cfg(target_os = "linux")]
+fn format_device_id(device_id: [u8; 8]) -> String {
+    format!(
+        "{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+        device_id[0],
+        device_id[1],
+        device_id[2],
+        device_id[3],
+        device_id[4],
+        device_id[5],
+        device_id[6],
+        device_id[7]
+    )
+}
+
 /// GET /values - Get all sensor readings and device information
 #[cfg(target_os = "linux")]
 pub async fn get_all_values(State(state): State<AppState>) -> Response {
@@ -49,9 +65,7 @@ pub async fn get_all_values(State(state): State<AppState>) -> Response {
         "daemon_version": state.version,
         "hardware_version": hardware_version.to_string(),
         "firmware_version": firmware_version.to_string(),
-        "device_id": format!("{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-            device_id[0], device_id[1], device_id[2], device_id[3],
-            device_id[4], device_id[5], device_id[6], device_id[7]),
+        "device_id": format_device_id(device_id),
         "V_in": measurements.dcin_voltage,
         "V_cap": measurements.supercap_voltage,
         "I_in": measurements.input_current,
@@ -67,63 +81,71 @@ pub async fn get_all_values(State(state): State<AppState>) -> Response {
 /// GET /values/:key - Get a specific value by key
 #[cfg(target_os = "linux")]
 pub async fn get_value(State(state): State<AppState>, Path(key): Path<String>) -> Response {
-    // Get all values
-    let device = state.device.lock().await;
-
-    let measurements = match device.get_measurements() {
-        Ok(m) => m,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": e.to_string()})),
-            )
-                .into_response();
+    // Match the requested key and only lock device if needed
+    match key.as_str() {
+        "daemon_version" => {
+            let value = json!(state.version);
+            (StatusCode::OK, Json(value)).into_response()
         }
-    };
+        "hardware_version" | "firmware_version" | "device_id" | "V_in" | "V_cap" | "I_in"
+        | "T_mcu" | "T_pcb" | "state" | "watchdog_elapsed" => {
+            let device = state.device.lock().await;
 
-    let hardware_version = device
-        .get_hardware_version()
-        .unwrap_or_else(|_| halpi_common::types::Version::from_bytes([255, 0, 0, 0]));
-    let firmware_version = device
-        .get_firmware_version()
-        .unwrap_or_else(|_| halpi_common::types::Version::from_bytes([255, 0, 0, 0]));
-    let device_id = device.get_device_id().unwrap_or([0; 8]);
+            // Read only the data needed for the requested key
+            let value: Result<Value, String> = match key.as_str() {
+                "hardware_version" => device
+                    .get_hardware_version()
+                    .map(|v| json!(v.to_string()))
+                    .or_else(|_| {
+                        Ok(json!(
+                            halpi_common::types::Version::from_bytes([255, 0, 0, 0]).to_string()
+                        ))
+                    }),
+                "firmware_version" => device
+                    .get_firmware_version()
+                    .map(|v| json!(v.to_string()))
+                    .or_else(|_| {
+                        Ok(json!(
+                            halpi_common::types::Version::from_bytes([255, 0, 0, 0]).to_string()
+                        ))
+                    }),
+                "device_id" => device
+                    .get_device_id()
+                    .map(|id| json!(format_device_id(id)))
+                    .or_else(|_| Ok(json!(format_device_id([0; 8])))),
+                "V_in" | "V_cap" | "I_in" | "T_mcu" | "T_pcb" | "state" | "watchdog_elapsed" => {
+                    match device.get_measurements() {
+                        Ok(m) => Ok(match key.as_str() {
+                            "V_in" => json!(m.dcin_voltage),
+                            "V_cap" => json!(m.supercap_voltage),
+                            "I_in" => json!(m.input_current),
+                            "T_mcu" => json!(kelvin_to_celsius(m.mcu_temperature)),
+                            "T_pcb" => json!(kelvin_to_celsius(m.pcb_temperature)),
+                            "state" => json!(m.power_state.name()),
+                            "watchdog_elapsed" => json!(m.watchdog_elapsed),
+                            _ => unreachable!(),
+                        }),
+                        Err(e) => Err(e.to_string()),
+                    }
+                }
+                _ => unreachable!(),
+            };
 
-    drop(device);
+            drop(device);
 
-    // Match the requested key and return the specific value
-    let value: Value = match key.as_str() {
-        "daemon_version" => json!(state.version),
-        "hardware_version" => json!(hardware_version.to_string()),
-        "firmware_version" => json!(firmware_version.to_string()),
-        "device_id" => json!(format!(
-            "{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-            device_id[0],
-            device_id[1],
-            device_id[2],
-            device_id[3],
-            device_id[4],
-            device_id[5],
-            device_id[6],
-            device_id[7]
-        )),
-        "V_in" => json!(measurements.dcin_voltage),
-        "V_cap" => json!(measurements.supercap_voltage),
-        "I_in" => json!(measurements.input_current),
-        "T_mcu" => json!(kelvin_to_celsius(measurements.mcu_temperature)),
-        "T_pcb" => json!(kelvin_to_celsius(measurements.pcb_temperature)),
-        "state" => json!(measurements.power_state.name()),
-        "watchdog_elapsed" => json!(measurements.watchdog_elapsed),
-        _ => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": format!("Unknown key: {}", key)})),
-            )
-                .into_response();
+            match value {
+                Ok(v) => (StatusCode::OK, Json(v)).into_response(),
+                Err(e) => {
+                    (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e}))).into_response()
+                }
+            }
         }
-    };
-
-    (StatusCode::OK, Json(value)).into_response()
+        _ => (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error": format!("Unknown key: {}", key)})),
+        )
+            .into_response(),
+    }
 }
 
 /// Stub for non-Linux platforms
