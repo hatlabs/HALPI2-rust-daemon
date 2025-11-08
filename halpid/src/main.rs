@@ -189,3 +189,111 @@ fn main() {
     eprintln!("halpid requires Linux for I2C device access");
     std::process::exit(1);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    #[test]
+    fn test_cli_verify() {
+        // Verify CLI structure is valid
+        Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn test_cli_no_args() {
+        let cli = Cli::try_parse_from(["halpid"]).unwrap();
+        assert!(cli.conf.is_none());
+        assert!(cli.i2c_bus.is_none());
+        assert!(cli.i2c_addr.is_none());
+        assert!(cli.socket.is_none());
+        assert!(cli.blackout_time_limit.is_none());
+        assert!(cli.blackout_voltage_limit.is_none());
+        assert!(cli.poweroff.is_none());
+    }
+
+    #[test]
+    fn test_cli_config_file() {
+        let cli = Cli::try_parse_from(["halpid", "--conf", "/etc/halpid/halpid.conf"]).unwrap();
+        assert_eq!(cli.conf, Some(PathBuf::from("/etc/halpid/halpid.conf")));
+    }
+
+    #[test]
+    fn test_cli_config_file_short() {
+        let cli = Cli::try_parse_from(["halpid", "-c", "/tmp/test.conf"]).unwrap();
+        assert_eq!(cli.conf, Some(PathBuf::from("/tmp/test.conf")));
+    }
+
+    #[test]
+    fn test_cli_i2c_bus() {
+        let cli = Cli::try_parse_from(["halpid", "--i2c-bus", "1"]).unwrap();
+        assert_eq!(cli.i2c_bus, Some(1));
+    }
+
+    #[test]
+    fn test_cli_i2c_addr() {
+        let cli = Cli::try_parse_from(["halpid", "--i2c-addr", "109"]).unwrap();
+        assert_eq!(cli.i2c_addr, Some(109)); // 0x6D = 109
+    }
+
+    #[test]
+    fn test_cli_socket() {
+        let cli = Cli::try_parse_from(["halpid", "--socket", "/run/halpid/halpid.sock"]).unwrap();
+        assert_eq!(cli.socket, Some(PathBuf::from("/run/halpid/halpid.sock")));
+    }
+
+    #[test]
+    fn test_cli_blackout_time_limit() {
+        let cli = Cli::try_parse_from(["halpid", "--blackout-time-limit", "5.0"]).unwrap();
+        assert_eq!(cli.blackout_time_limit, Some(5.0));
+    }
+
+    #[test]
+    fn test_cli_blackout_voltage_limit() {
+        let cli = Cli::try_parse_from(["halpid", "--blackout-voltage-limit", "9.0"]).unwrap();
+        assert_eq!(cli.blackout_voltage_limit, Some(9.0));
+    }
+
+    #[test]
+    fn test_cli_poweroff() {
+        let cli = Cli::try_parse_from(["halpid", "--poweroff", "/sbin/poweroff"]).unwrap();
+        assert_eq!(cli.poweroff, Some("/sbin/poweroff".to_string()));
+    }
+
+    #[test]
+    fn test_cli_poweroff_empty_for_dry_run() {
+        let cli = Cli::try_parse_from(["halpid", "--poweroff", ""]).unwrap();
+        assert_eq!(cli.poweroff, Some("".to_string()));
+    }
+
+    #[test]
+    fn test_cli_all_options() {
+        let cli = Cli::try_parse_from([
+            "halpid",
+            "--conf",
+            "/etc/halpid/halpid.conf",
+            "--i2c-bus",
+            "1",
+            "--i2c-addr",
+            "109",
+            "--socket",
+            "/run/halpid/halpid.sock",
+            "--blackout-time-limit",
+            "5.0",
+            "--blackout-voltage-limit",
+            "9.0",
+            "--poweroff",
+            "/sbin/poweroff",
+        ])
+        .unwrap();
+
+        assert_eq!(cli.conf, Some(PathBuf::from("/etc/halpid/halpid.conf")));
+        assert_eq!(cli.i2c_bus, Some(1));
+        assert_eq!(cli.i2c_addr, Some(109));
+        assert_eq!(cli.socket, Some(PathBuf::from("/run/halpid/halpid.sock")));
+        assert_eq!(cli.blackout_time_limit, Some(5.0));
+        assert_eq!(cli.blackout_voltage_limit, Some(9.0));
+        assert_eq!(cli.poweroff, Some("/sbin/poweroff".to_string()));
+    }
+}
