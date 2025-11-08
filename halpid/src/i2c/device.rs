@@ -74,8 +74,8 @@ impl HalpiDevice {
     ///
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
     fn read_byte(&mut self, reg: u8) -> Result<u8, I2cError> {
-        self.retry_operation(|| {
-            self.device
+        self.retry_operation(|device| {
+            device
                 .smbus_read_byte_data(reg)
                 .map_err(|e| I2cError::Read {
                     reg,
@@ -88,11 +88,11 @@ impl HalpiDevice {
     ///
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
     fn read_bytes(&mut self, reg: u8, count: usize) -> Result<Vec<u8>, I2cError> {
-        self.retry_operation(|| {
+        self.retry_operation(|device| {
             let mut buffer = vec![0u8; count];
-            self.device
+            device
                 .write(&[reg])
-                .and_then(|_| self.device.read(&mut buffer))
+                .and_then(|_| device.read(&mut buffer))
                 .map_err(|e| I2cError::Read {
                     reg,
                     source: e.into(),
@@ -129,8 +129,8 @@ impl HalpiDevice {
     ///
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
     fn write_byte(&mut self, reg: u8, value: u8) -> Result<(), I2cError> {
-        self.retry_operation(|| {
-            self.device
+        self.retry_operation(|device| {
+            device
                 .smbus_write_byte_data(reg, value)
                 .map_err(|e| I2cError::Write {
                     reg,
@@ -144,8 +144,8 @@ impl HalpiDevice {
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
     fn write_word(&mut self, reg: u8, value: u16) -> Result<(), I2cError> {
         let bytes = protocol::encode_word(value);
-        self.retry_operation(|| {
-            self.device
+        self.retry_operation(|device| {
+            device
                 .write(&[reg, bytes[0], bytes[1]])
                 .map_err(|e| I2cError::Write {
                     reg,
@@ -158,11 +158,11 @@ impl HalpiDevice {
     ///
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
     fn write_bytes(&mut self, reg: u8, values: &[u8]) -> Result<(), I2cError> {
-        self.retry_operation(|| {
+        self.retry_operation(|device| {
             let mut data = Vec::with_capacity(1 + values.len());
             data.push(reg);
             data.extend_from_slice(values);
-            self.device.write(&data).map_err(|e| I2cError::Write {
+            device.write(&data).map_err(|e| I2cError::Write {
                 reg,
                 source: e.into(),
             })
@@ -194,14 +194,14 @@ impl HalpiDevice {
     ///
     /// Retries up to MAX_RETRIES times with RETRY_DELAY between attempts.
     /// Only retries on errors that are likely to be transient (I/O errors).
-    fn retry_operation<T, F>(&mut self, mut operation: F) -> Result<T, I2cError>
-    where
-        F: FnMut() -> Result<T, I2cError>,
-    {
+    fn retry_operation<T>(
+        &mut self,
+        mut operation: impl FnMut(&mut LinuxI2CDevice) -> Result<T, I2cError>,
+    ) -> Result<T, I2cError> {
         let mut last_error = None;
 
         for attempt in 0..=MAX_RETRIES {
-            match operation() {
+            match operation(&mut self.device) {
                 Ok(result) => return Ok(result),
                 Err(err) => {
                     // Only retry on transient errors (I/O errors)
