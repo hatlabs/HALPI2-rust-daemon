@@ -60,6 +60,32 @@ Use the `./run` script for all development tasks:
 ./run dev:version:bump 5.1.0
 ```
 
+## Git Workflow
+
+**Feature Branch Workflow**: All development must follow this workflow:
+
+1. **Create a feature branch** for each issue or set of related issues
+2. **Commit changes** to the feature branch with conventional commit messages
+3. **Push the branch** to GitHub
+4. **Create a Pull Request** for review, testing, and CI validation
+5. **Merge via PR** - never push directly to main
+
+### Creating a Pull Request
+
+After pushing your feature branch:
+
+```bash
+# Push your feature branch
+git push -u origin <branch-name>
+
+# Create PR using gh CLI
+gh pr create --title "Title" --body "Description"
+
+# Or use the URL provided by git push to create PR in browser
+```
+
+**IMPORTANT**: Issues are closed automatically when PRs are merged if the commit message includes "Closes #N" or "Fixes #N".
+
 ## Pre-Commit Checklist for Claude Code
 
 **IMPORTANT**: Before every commit, run these commands locally to catch issues before CI:
