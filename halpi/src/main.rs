@@ -27,10 +27,10 @@ enum Commands {
     /// Shutdown or standby the system
     Shutdown {
         /// Enter standby mode instead of shutdown
-        #[arg(long)]
+        #[arg(long, requires = "time")]
         standby: bool,
         /// Wakeup time for standby (seconds or datetime string)
-        #[arg(long, required_if_eq("standby", "true"))]
+        #[arg(long)]
         time: Option<String>,
     },
     /// Control USB port power
