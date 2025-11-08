@@ -60,6 +60,21 @@ Use the `./run` script for all development tasks:
 ./run dev:version:bump 5.1.0
 ```
 
+## Pre-Commit Checklist for Claude Code
+
+**IMPORTANT**: Before every commit, run these commands locally to catch issues before CI:
+
+```bash
+cargo fmt && cargo clippy --all-targets -- -D warnings && cargo test
+```
+
+This ensures:
+1. **Formatting** - Code is formatted according to rustfmt standards (CI runs `cargo fmt --check`)
+2. **Linting** - No clippy warnings (CI runs with `-D warnings` which treats warnings as errors)
+3. **Tests** - All tests pass
+
+**Why this matters**: The CI enforces these checks with `-D warnings`, meaning any warning becomes a build failure. Running locally first saves CI cycles and iteration time.
+
 ## Architecture Overview
 
 ### Workspace Structure
