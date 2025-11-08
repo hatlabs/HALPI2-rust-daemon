@@ -12,6 +12,7 @@ description = "Shared types and utilities for HALPI2 daemon and CLI"
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+serde_yaml.workspace = true
 thiserror.workspace = true
 
 [lib]
