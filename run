@@ -177,8 +177,8 @@ function dev:version:bump {
   fi
 
   echo "Bumping version to $new_version..."
-  sed -i.bak "s/^version = \".*\"/version = \"$new_version\"/" Cargo.toml
-  rm -f Cargo.toml.bak
+  # Portable sed in-place replacement (works on GNU and BSD)
+  sed "s/^version = \".*\"/version = \"$new_version\"/" Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 
   echo "✅ Version bumped to $new_version in Cargo.toml"
   echo "Run 'cargo update' to update Cargo.lock"
