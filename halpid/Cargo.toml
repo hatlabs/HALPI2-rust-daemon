@@ -37,3 +37,26 @@ signal-hook-tokio = { version = "0.3", features = ["futures-v0_3"] }
 [[bin]]
 name = "halpid"
 path = "src/main.rs"
+
+[package.metadata.deb]
+maintainer = "Hat Labs Ltd. <info@hatlabs.fi>"
+copyright = "2025, Hat Labs Ltd."
+license-file = ["../LICENSE", "0"]
+extended-description = """\
+HALPI2 power monitoring and watchdog daemon (Rust implementation).
+Provides power management, blackout detection, and hardware watchdog
+functionality for HALPI2 Raspberry Pi CM4/CM5 carrier boards."""
+depends = "$auto"
+section = "admin"
+priority = "optional"
+assets = [
+    ["target/release/halpid", "usr/bin/", "755"],
+    ["target/release/halpi", "usr/bin/", "755"],
+    ["../config/halpid.conf", "etc/halpid/halpid.conf", "644"],
+    ["../systemd/halpid.service", "lib/systemd/system/", "644"],
+]
+conf-files = [
+    "/etc/halpid/halpid.conf",
+]
+maintainer-scripts = "debian/"
+systemd-units = { unit-name = "halpid" }

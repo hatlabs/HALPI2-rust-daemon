@@ -1,0 +1,54 @@
+#!/bin/sh
+set -e
+
+# Post-installation script for halpid
+# This script runs after the package is installed
+
+case "$1" in
+    configure)
+        # Ensure the socket directory exists with correct permissions
+        if [ ! -d /run/halpid ]; then
+            mkdir -p /run/halpid
+            chmod 755 /run/halpid
+        fi
+
+        # Ensure the adm group exists (for socket access)
+        if ! getent group adm > /dev/null 2>&1; then
+            addgroup --system adm
+        fi
+
+        # Reload systemd daemon to recognize new service
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload || true
+        fi
+
+        # Enable the service to start on boot
+        if [ -d /run/systemd/system ]; then
+            systemctl enable halpid.service || true
+        fi
+
+        # Start the service (only on fresh install, not upgrade)
+        if [ -z "$2" ]; then
+            if [ -d /run/systemd/system ]; then
+                systemctl start halpid.service || true
+            fi
+        else
+            # On upgrade, restart the service
+            if [ -d /run/systemd/system ]; then
+                systemctl try-restart halpid.service || true
+            fi
+        fi
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

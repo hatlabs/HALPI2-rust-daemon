@@ -1,0 +1,28 @@
+#!/bin/sh
+set -e
+
+# Pre-removal script for halpid
+# This script runs before the package is removed
+
+case "$1" in
+    remove|deconfigure)
+        # Stop the service before removal
+        if [ -d /run/systemd/system ]; then
+            systemctl stop halpid.service || true
+            systemctl disable halpid.service || true
+        fi
+        ;;
+
+    upgrade|failed-upgrade)
+        # Don't stop the service during upgrade
+        ;;
+
+    *)
+        echo "prerm called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0
