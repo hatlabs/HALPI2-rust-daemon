@@ -30,7 +30,7 @@ enum Commands {
         #[arg(long)]
         standby: bool,
         /// Wakeup time for standby (seconds or datetime string)
-        #[arg(long, requires = "standby")]
+        #[arg(long, required_if_eq("standby", "true"))]
         time: Option<String>,
     },
     /// Control USB port power
@@ -101,5 +101,147 @@ async fn main() {
     if let Err(e) = result {
         eprintln!("Error: {}", e);
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    #[test]
+    fn test_cli_verify() {
+        // Verify CLI structure is valid
+        Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn test_cli_status_command() {
+        let cli = Cli::try_parse_from(["halpi", "status"]).unwrap();
+        assert!(matches!(cli.command, Some(Commands::Status)));
+    }
+
+    #[test]
+    fn test_cli_version_command() {
+        let cli = Cli::try_parse_from(["halpi", "version"]).unwrap();
+        assert!(matches!(cli.command, Some(Commands::Version)));
+    }
+
+    #[test]
+    fn test_cli_config_all() {
+        let cli = Cli::try_parse_from(["halpi", "config"]).unwrap();
+        match cli.command {
+            Some(Commands::Config { key }) => assert!(key.is_none()),
+            _ => panic!("Expected Config command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_config_with_key() {
+        let cli = Cli::try_parse_from(["halpi", "config", "blackout-time-limit"]).unwrap();
+        match cli.command {
+            Some(Commands::Config { key }) => {
+                assert_eq!(key, Some("blackout-time-limit".to_string()))
+            }
+            _ => panic!("Expected Config command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_shutdown() {
+        let cli = Cli::try_parse_from(["halpi", "shutdown"]).unwrap();
+        match cli.command {
+            Some(Commands::Shutdown { standby, time }) => {
+                assert!(!standby);
+                assert!(time.is_none());
+            }
+            _ => panic!("Expected Shutdown command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_standby_with_delay() {
+        let cli = Cli::try_parse_from(["halpi", "shutdown", "--standby", "--time", "300"]).unwrap();
+        match cli.command {
+            Some(Commands::Shutdown { standby, time }) => {
+                assert!(standby);
+                assert_eq!(time, Some("300".to_string()));
+            }
+            _ => panic!("Expected Shutdown command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_standby_with_datetime() {
+        let cli = Cli::try_parse_from([
+            "halpi",
+            "shutdown",
+            "--standby",
+            "--time",
+            "2025-12-31T23:59:59",
+        ])
+        .unwrap();
+        match cli.command {
+            Some(Commands::Shutdown { standby, time }) => {
+                assert!(standby);
+                assert_eq!(time, Some("2025-12-31T23:59:59".to_string()));
+            }
+            _ => panic!("Expected Shutdown command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_usb_status() {
+        let cli = Cli::try_parse_from(["halpi", "usb"]).unwrap();
+        match cli.command {
+            Some(Commands::Usb { action }) => assert!(action.is_none()),
+            _ => panic!("Expected Usb command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_usb_enable() {
+        let cli = Cli::try_parse_from(["halpi", "usb", "enable", "0"]).unwrap();
+        match cli.command {
+            Some(Commands::Usb { action }) => match action {
+                Some(UsbAction::Enable { port }) => assert_eq!(port, "0"),
+                _ => panic!("Expected Enable action"),
+            },
+            _ => panic!("Expected Usb command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_usb_disable() {
+        let cli = Cli::try_parse_from(["halpi", "usb", "disable", "all"]).unwrap();
+        match cli.command {
+            Some(Commands::Usb { action }) => match action {
+                Some(UsbAction::Disable { port }) => assert_eq!(port, "all"),
+                _ => panic!("Expected Disable action"),
+            },
+            _ => panic!("Expected Usb command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_flash() {
+        let cli = Cli::try_parse_from(["halpi", "flash", "/path/to/firmware.bin"]).unwrap();
+        match cli.command {
+            Some(Commands::Flash { firmware }) => assert_eq!(firmware, "/path/to/firmware.bin"),
+            _ => panic!("Expected Flash command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_standby_requires_time() {
+        // This should fail because --standby requires --time
+        let result = Cli::try_parse_from(["halpi", "shutdown", "--standby"]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cli_no_command_defaults_to_version() {
+        let cli = Cli::try_parse_from(["halpi"]).unwrap();
+        assert!(cli.command.is_none());
     }
 }

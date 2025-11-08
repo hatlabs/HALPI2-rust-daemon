@@ -237,3 +237,32 @@ impl Default for HalpiClient {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_client_new() {
+        let client = HalpiClient::new();
+        assert_eq!(client.socket_path.to_str().unwrap(), DEFAULT_SOCKET_PATH);
+    }
+
+    #[test]
+    fn test_client_with_socket_path() {
+        let custom_path = "/tmp/test.sock";
+        let client = HalpiClient::with_socket_path(custom_path);
+        assert_eq!(client.socket_path.to_str().unwrap(), custom_path);
+    }
+
+    #[test]
+    fn test_client_default() {
+        let client = HalpiClient::default();
+        assert_eq!(client.socket_path.to_str().unwrap(), DEFAULT_SOCKET_PATH);
+    }
+
+    #[test]
+    fn test_default_socket_path_value() {
+        assert_eq!(DEFAULT_SOCKET_PATH, "/run/halpid/halpid.sock");
+    }
+}
