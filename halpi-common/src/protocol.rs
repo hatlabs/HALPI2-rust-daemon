@@ -221,6 +221,21 @@ impl DFUState {
     pub fn to_byte(self) -> u8 {
         self as u8
     }
+
+    /// Get human-readable name of the state
+    pub fn name(&self) -> &'static str {
+        match self {
+            DFUState::Idle => "Idle",
+            DFUState::Preparing => "Preparing",
+            DFUState::Updating => "Updating",
+            DFUState::QueueFull => "QueueFull",
+            DFUState::ReadyToCommit => "ReadyToCommit",
+            DFUState::CrcError => "CrcError",
+            DFUState::DataLengthError => "DataLengthError",
+            DFUState::WriteError => "WriteError",
+            DFUState::ProtocolError => "ProtocolError",
+        }
+    }
 }
 
 // ============================================================================
@@ -316,7 +331,7 @@ pub const TEMP_MIN_KELVIN: f64 = 273.15 - 40.0;
 /// Maximum temperature in Kelvin (+100°C)
 pub const TEMP_MAX_KELVIN: f64 = 273.15 + 100.0;
 
-/// Temperature range (TEMP_MAX - TEMP_MIN)
+/// Temperature range (TEMP_MAX_KELVIN - TEMP_MIN_KELVIN)
 pub const TEMP_RANGE_KELVIN: f64 = TEMP_MAX_KELVIN - TEMP_MIN_KELVIN;
 
 /// Convert Kelvin to Celsius
@@ -402,6 +417,13 @@ mod tests {
 
         assert_eq!(DFUState::Idle.to_byte(), 0);
         assert_eq!(DFUState::ProtocolError.to_byte(), 8);
+    }
+
+    #[test]
+    fn test_dfu_state_names() {
+        assert_eq!(DFUState::Idle.name(), "Idle");
+        assert_eq!(DFUState::Updating.name(), "Updating");
+        assert_eq!(DFUState::ProtocolError.name(), "ProtocolError");
     }
 
     #[test]
