@@ -175,11 +175,6 @@ async fn main() {
     info!("Daemon shutdown complete");
 }
 
-fn main() {
-    eprintln!("halpid requires Linux for I2C device access");
-    std::process::exit(1);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
