@@ -110,7 +110,8 @@ jobs:
       if: steps.check_release.outputs.skip == 'false'
       run: |
         # Build Debian package for halpid (includes both binaries)
-        cargo deb --target aarch64-unknown-linux-musl --package halpid --no-build
+        # Use --no-strip because cross-platform stripping doesn't work with host's strip command
+        cargo deb --target aarch64-unknown-linux-musl --package halpid --no-build --no-strip
 
         # Find the generated .deb file with specific pattern
         deb_file=$(find target/aarch64-unknown-linux-musl/debian/ -name "halpid_*_arm64.deb" -type f | head -1)
