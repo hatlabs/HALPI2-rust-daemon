@@ -14,9 +14,10 @@ use crate::i2c::HalpiDevice;
 ///
 /// This timeout must be longer than the state machine polling interval (100ms).
 /// The firmware automatically feeds the watchdog on ANY I2C operation, so our
-/// regular polling (get_measurements every 100ms) keeps it alive. The 10-second
-/// timeout provides sufficient margin while being short enough to safely power
-/// down the system if the daemon becomes unresponsive.
+/// regular polling (get_measurements every 100ms) keeps it alive.
+///
+/// If the timeout expires (firmware cannot communicate with daemon), the system
+/// will be hard power-cycled as an emergency recovery mechanism.
 const WATCHDOG_TIMEOUT_MS: u16 = 10000;
 
 /// State machine polling interval in milliseconds (100ms)
