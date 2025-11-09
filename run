@@ -113,6 +113,198 @@ function test:coverage {
 }
 
 ################################################################################
+# Docker-based Build Commands (for macOS/non-Linux development)
+
+function build:docker {
+  #@ Build in Docker container (automatic Linux environment)
+  #@ Category: Docker Build
+  local build_args="$@"
+
+  echo "🏗️  Building in Docker container..."
+
+  # Detect host architecture for platform selection
+  local arch=$(uname -m)
+  local platform=""
+  case "$arch" in
+    arm64|aarch64) platform="linux/arm64" ;;
+    x86_64|amd64) platform="linux/amd64" ;;
+    *) platform="linux/amd64" ;;  # Default to amd64 if unknown
+  esac
+
+  docker run --rm \
+    --platform "$platform" \
+    -v "$(pwd):/workspace" \
+    -w /workspace \
+    mcr.microsoft.com/devcontainers/rust:1-bookworm \
+    bash -c "
+      set -e
+      echo '📦 Installing ARM64 target...'
+      rustup target add aarch64-unknown-linux-musl
+      echo '🔨 Running cargo build $build_args...'
+      cargo build $build_args
+      echo '✅ Build complete!'
+    "
+
+  if [ $? -eq 0 ]; then
+    echo "✅ Build successful in Docker container"
+  else
+    echo "❌ Build failed"
+    return 1
+  fi
+}
+
+function build:docker:cross {
+  #@ Build for ARM64 in Docker container using cross
+  #@ Category: Docker Build
+  local build_args="$@"
+
+  echo "🏗️  Cross-compiling for ARM64 in Docker container..."
+
+  # Detect host architecture for platform selection
+  local arch=$(uname -m)
+  local platform=""
+  local cache_suffix=""
+  case "$arch" in
+    arm64|aarch64)
+      platform="linux/arm64"
+      cache_suffix="arm64"
+      ;;
+    x86_64|amd64)
+      platform="linux/amd64"
+      cache_suffix="amd64"
+      ;;
+    *)
+      platform="linux/amd64"
+      cache_suffix="amd64"
+      ;;
+  esac
+
+  # Create architecture-specific Docker volume for cargo cache
+  local cache_volume="halpi2-cargo-cache-${cache_suffix}"
+  docker volume create "$cache_volume" > /dev/null 2>&1 || true
+
+  docker run --rm \
+    --platform "$platform" \
+    -v "$(pwd):/workspace" \
+    -w /workspace \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v "${cache_volume}:/cargo-cache" \
+    mcr.microsoft.com/devcontainers/rust:1-bookworm \
+    bash -c "
+      set -e
+      echo '📦 Installing Docker CLI for cross...'
+      apt-get update -qq && apt-get install -y -qq docker.io > /dev/null 2>&1
+
+      echo '📦 Installing cross-compilation tools...'
+      rustup target add aarch64-unknown-linux-musl > /dev/null 2>&1
+
+      # Check if cross is cached, otherwise install it
+      if [ -f /cargo-cache/bin/cross ]; then
+        echo '   Using cached cross binary'
+        cp /cargo-cache/bin/cross /usr/local/cargo/bin/
+        chmod +x /usr/local/cargo/bin/cross
+      else
+        echo '   Installing cross (this will be cached)...'
+        cargo install cross --locked 2>&1 | grep -E '(Installing|Installed)' || true
+        mkdir -p /cargo-cache/bin
+        cp /usr/local/cargo/bin/cross /cargo-cache/bin/ 2>/dev/null || true
+      fi
+
+      echo '🔨 Running cross build for ARM64...'
+      cross build --target aarch64-unknown-linux-musl $build_args
+      echo '✅ Cross-compilation complete!'
+    "
+
+  if [ $? -eq 0 ]; then
+    echo "✅ ARM64 build successful"
+    echo "   Binaries in: target/aarch64-unknown-linux-musl/"
+  else
+    echo "❌ Build failed"
+    return 1
+  fi
+}
+
+function package:deb:docker {
+  #@ Build Debian package for ARM64 in Docker container
+  #@ Category: Docker Build
+
+  echo "🏗️  Building Debian package for ARM64 in Docker container..."
+
+  # Detect host architecture for platform selection
+  local arch=$(uname -m)
+  local platform=""
+  local cache_suffix=""
+  case "$arch" in
+    arm64|aarch64)
+      platform="linux/arm64"
+      cache_suffix="arm64"
+      ;;
+    x86_64|amd64)
+      platform="linux/amd64"
+      cache_suffix="amd64"
+      ;;
+    *)
+      platform="linux/amd64"
+      cache_suffix="amd64"
+      ;;
+  esac
+
+  # Create architecture-specific Docker volume for cargo cache
+  local cache_volume="halpi2-cargo-cache-${cache_suffix}"
+  docker volume create "$cache_volume" > /dev/null 2>&1 || true
+
+  docker run --rm \
+    --platform "$platform" \
+    -v "$(pwd):/workspace" \
+    -w /workspace \
+    -v "${cache_volume}:/cargo-cache" \
+    mcr.microsoft.com/devcontainers/rust:1-bookworm \
+    bash -c "
+      set -e
+      echo '📦 Installing ARM64 cross-compilation toolchain...'
+      apt-get update -qq && apt-get install -y -qq gcc-aarch64-linux-gnu > /dev/null 2>&1
+
+      echo '📦 Installing build tools...'
+      rustup target add aarch64-unknown-linux-musl
+
+      # Check if cargo-deb is cached, otherwise install it
+      if [ -f /cargo-cache/bin/cargo-deb ]; then
+        echo '   Using cached cargo-deb binary'
+        cp /cargo-cache/bin/cargo-deb /usr/local/cargo/bin/
+        chmod +x /usr/local/cargo/bin/cargo-deb
+      else
+        echo '   Installing cargo-deb (this will be cached)...'
+        cargo install cargo-deb --locked 2>&1 | grep -E '(Installing|Installed)' || true
+        mkdir -p /cargo-cache/bin
+        cp /usr/local/cargo/bin/cargo-deb /cargo-cache/bin/ 2>/dev/null || true
+      fi
+
+      echo '🔨 Building release binary for ARM64...'
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc \
+      cargo build --target aarch64-unknown-linux-musl --release
+
+      echo '📦 Creating Debian package...'
+      cargo deb -p halpid --target aarch64-unknown-linux-musl --no-build
+
+      echo '✅ Debian package built!'
+    "
+
+  if [ $? -eq 0 ]; then
+    echo ""
+    echo "✅ Debian package built successfully!"
+    local deb_file=$(ls -t target/aarch64-unknown-linux-musl/debian/*.deb 2>/dev/null | head -1)
+    if [ -n "$deb_file" ]; then
+      echo "   Package: $deb_file"
+      ls -lh "$deb_file"
+    fi
+  else
+    echo ""
+    echo "❌ Package build failed"
+    return 1
+  fi
+}
+
+################################################################################
 # Package Management Commands
 
 function package:deb {
@@ -303,8 +495,9 @@ cmd=${cmd//-/:}
 
 # Check if function exists
 if declare -f "$cmd" > /dev/null; then
-  # Run the command
-  "$cmd" "$@"
+  # Run the command with timing
+  TIMEFORMAT=$'\nTask completed in %3lR'
+  time "$cmd" "$@"
 else
   echo "Error: Unknown command '$cmd'"
   echo

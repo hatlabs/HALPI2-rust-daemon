@@ -1,0 +1,24 @@
+[Unit]
+Description=HALPI2 Power Monitoring and Watchdog Daemon
+Documentation=https://docs.hatlabs.fi/halpi2
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/halpid
+Restart=on-failure
+RestartSec=10
+User=root
+Environment=RUST_LOG=info
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening (optional but recommended)
+# These can be uncommented for additional security
+# ProtectSystem=strict
+# ProtectHome=true
+# PrivateTmp=true
+# NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
