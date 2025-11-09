@@ -172,6 +172,17 @@ impl HalpiClient {
         anyhow::bail!("Unix sockets not supported on this platform")
     }
 
+    /// Set a configuration value
+    pub async fn set_config(&self, key: &str, value: Value) -> Result<()> {
+        #[cfg(unix)]
+        {
+            self.put(&format!("/config/{}", key), &value).await
+        }
+
+        #[cfg(not(unix))]
+        anyhow::bail!("Unix sockets not supported on this platform")
+    }
+
     /// Get USB port states
     pub async fn get_usb_ports(&self) -> Result<HashMap<String, bool>> {
         #[cfg(unix)]
