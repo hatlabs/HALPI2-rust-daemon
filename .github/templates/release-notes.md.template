@@ -11,12 +11,11 @@ _Edit this section to highlight the most important changes in this release._
 
 ### From APT Repository (Recommended)
 
-```bash
-# Add HAT Labs APT repository (if not already added)
-echo "deb [trusted=yes] https://apt.hatlabs.fi stable main" | \
-    sudo tee /etc/apt/sources.list.d/hatlabs.list
+**First time setup**: Add the HAT Labs repository by following the instructions at [apt.hatlabs.fi](https://apt.hatlabs.fi)
 
-# Update and install/upgrade
+**Install or upgrade**:
+
+```bash
 sudo apt update
 sudo apt install halpid  # or: sudo apt upgrade halpid
 ```
