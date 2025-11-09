@@ -20,7 +20,7 @@ jobs:
     - name: Read version from Cargo.toml
       id: version
       run: |
-        VERSION=$(grep -m1 '^version =' halpid/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+        VERSION=$(grep -m1 '^version =' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Version: $VERSION"
 
@@ -60,10 +60,17 @@ jobs:
       with:
         targets: aarch64-unknown-linux-musl
 
+    - name: Cache cargo bin
+      if: steps.check_release.outputs.skip == 'false'
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/bin
+        key: ${{ runner.os }}-cargo-bin-${{ hashFiles('**/Cargo.lock') }}
+
     - name: Install cross-compilation tools
       if: steps.check_release.outputs.skip == 'false'
       run: |
-        cargo install cross --git https://github.com/cross-rs/cross
+        cargo install cross --locked
 
     - name: Cache cargo registry
       if: steps.check_release.outputs.skip == 'false'
@@ -84,7 +91,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: target
-        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-cargo-build-target-aarch64-unknown-linux-musl-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Build binaries for ARM64
       if: steps.check_release.outputs.skip == 'false'
@@ -95,7 +102,7 @@ jobs:
     - name: Install cargo-deb
       if: steps.check_release.outputs.skip == 'false'
       run: |
-        cargo install cargo-deb
+        cargo install cargo-deb --locked
 
     - name: Build Debian package
       if: steps.check_release.outputs.skip == 'false'
@@ -169,7 +176,7 @@ jobs:
         echo "Generated release notes:"
         cat release_notes.md
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ github.token }}
 
     - name: Create draft release
       if: steps.check_release.outputs.skip == 'false'
