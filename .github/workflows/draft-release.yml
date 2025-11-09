@@ -1,0 +1,218 @@
+name: Build and Draft Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build-daemon:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Read version from Cargo.toml
+      id: version
+      run: |
+        VERSION=$(grep -m1 '^version =' halpid/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+
+    - name: Check if release exists
+      id: check_release
+      run: |
+        if gh release view "v${{ steps.version.outputs.version }}" &>/dev/null; then
+          IS_DRAFT=$(gh release view "v${{ steps.version.outputs.version }}" --json isDraft --jq '.isDraft')
+          if [ "$IS_DRAFT" = "true" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "delete_existing=true" >> $GITHUB_OUTPUT
+            echo "Existing draft release found - will delete and recreate"
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "delete_existing=false" >> $GITHUB_OUTPUT
+            echo "Published release v${{ steps.version.outputs.version }} already exists - skipping"
+          fi
+        else
+          echo "skip=false" >> $GITHUB_OUTPUT
+          echo "delete_existing=false" >> $GITHUB_OUTPUT
+          echo "No existing release found"
+        fi
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Delete existing draft release
+      if: steps.check_release.outputs.delete_existing == 'true'
+      run: |
+        echo "Deleting existing draft release v${{ steps.version.outputs.version }}"
+        gh release delete "v${{ steps.version.outputs.version }}" --yes
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Setup Rust
+      if: steps.check_release.outputs.skip == 'false'
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-unknown-linux-musl
+
+    - name: Install cross-compilation tools
+      if: steps.check_release.outputs.skip == 'false'
+      run: |
+        cargo install cross --git https://github.com/cross-rs/cross
+
+    - name: Cache cargo registry
+      if: steps.check_release.outputs.skip == 'false'
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo index
+      if: steps.check_release.outputs.skip == 'false'
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache target directory
+      if: steps.check_release.outputs.skip == 'false'
+      uses: actions/cache@v4
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build binaries for ARM64
+      if: steps.check_release.outputs.skip == 'false'
+      run: |
+        cross build --release --target aarch64-unknown-linux-musl
+        ls -la target/aarch64-unknown-linux-musl/release/
+
+    - name: Install cargo-deb
+      if: steps.check_release.outputs.skip == 'false'
+      run: |
+        cargo install cargo-deb
+
+    - name: Build Debian package
+      if: steps.check_release.outputs.skip == 'false'
+      run: |
+        # Build Debian package for halpid (includes both binaries)
+        cargo deb --target aarch64-unknown-linux-musl --package halpid --no-build
+
+        # Find the generated .deb file
+        deb_file=$(find target/aarch64-unknown-linux-musl/debian/ -name "*.deb" | head -1)
+
+        if [ -f "$deb_file" ]; then
+          # Create artifacts directory
+          mkdir -p artifacts
+
+          # Copy .deb to artifacts
+          cp "$deb_file" artifacts/
+          echo "✓ Debian package created: $(basename "$deb_file")"
+
+          # Show package info
+          dpkg --info "$deb_file"
+        else
+          echo "❌ Failed to find generated .deb file"
+          find target/aarch64-unknown-linux-musl/debian/ -type f
+          exit 1
+        fi
+
+    - name: Create build-info.txt
+      if: steps.check_release.outputs.skip == 'false'
+      run: |
+        VERSION=${{ steps.version.outputs.version }}
+
+        cat > artifacts/build-info.txt << EOF
+        Build Date: $(date -u)
+        Git Commit: ${{ github.sha }}
+        Git Tag: v${VERSION}
+        Workflow: ${{ github.run_id }}
+
+        Files included:
+        - halpid_${VERSION}_arm64.deb - Debian package (includes halpid daemon and halpi CLI)
+        - build-info.txt - This file
+
+        Installation:
+        1. Download the .deb package
+        2. Install: sudo dpkg -i halpid_${VERSION}_arm64.deb
+        3. Service starts automatically
+        4. Test: halpi status
+
+        For migration from Python version, see docs/MIGRATION.md
+        EOF
+
+        echo "Final artifacts:"
+        ls -la artifacts/
+
+    - name: Generate release notes
+      if: steps.check_release.outputs.skip == 'false'
+      run: |
+        VERSION=${{ steps.version.outputs.version }}
+
+        # Get the latest published release tag for changelog
+        LAST_TAG=$(gh release list --limit 100 --json tagName,isPrerelease,isDraft --jq '.[] | select(.isDraft == false and .isPrerelease == false) | .tagName' | head -n1)
+
+        # Use the script to generate release notes (will fail workflow if script fails)
+        bash .github/scripts/generate-release-notes.sh "$VERSION" "$LAST_TAG" "${{ github.repository }}" > release_notes.md
+
+        # Verify the file was created and is not empty
+        if [ ! -s release_notes.md ]; then
+          echo "Error: Failed to generate release notes or file is empty" >&2
+          exit 1
+        fi
+
+        echo "Generated release notes:"
+        cat release_notes.md
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create draft release
+      if: steps.check_release.outputs.skip == 'false'
+      run: |
+        VERSION=${{ steps.version.outputs.version }}
+
+        # Create new draft release with generated notes
+        gh release create v$VERSION \
+          --draft \
+          --title "HALPI2 Rust Daemon v$VERSION" \
+          --notes-file release_notes.md \
+          artifacts/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create workflow summary
+      if: steps.check_release.outputs.skip == 'false'
+      run: |
+        VERSION=${{ steps.version.outputs.version }}
+
+        # Get the release URL dynamically after creation
+        RELEASE_URL=$(gh release view v$VERSION --json url --jq '.url')
+
+        echo "## ✅ Draft Release Created: v$VERSION" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📝 Next Steps" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "1. **Review Release Notes:** [v$VERSION Draft]($RELEASE_URL)" >> $GITHUB_STEP_SUMMARY
+        echo "2. **Edit the \"What's New\" section** to highlight key changes" >> $GITHUB_STEP_SUMMARY
+        echo "3. **Test the Debian package** on Raspberry Pi hardware if possible" >> $GITHUB_STEP_SUMMARY
+        echo "4. **Publish the release** when ready (triggers APT repo update)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Included Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- Debian package (halpid daemon + halpi CLI)" >> $GITHUB_STEP_SUMMARY
+        echo "- Build metadata" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🧪 Testing Instructions" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "1. Download \`halpid_${VERSION}_arm64.deb\`" >> $GITHUB_STEP_SUMMARY
+        echo "2. Install: \`sudo dpkg -i halpid_${VERSION}_arm64.deb\`" >> $GITHUB_STEP_SUMMARY
+        echo "3. Check service: \`systemctl status halpid\`" >> $GITHUB_STEP_SUMMARY
+        echo "4. Test CLI: \`halpi status\`, \`halpi version\`" >> $GITHUB_STEP_SUMMARY
+        echo "5. Test I2C communication (if hardware available)" >> $GITHUB_STEP_SUMMARY
+      env:
+        GH_TOKEN: ${{ github.token }}
