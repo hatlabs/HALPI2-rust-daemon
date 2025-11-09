@@ -242,7 +242,7 @@ Some endpoints can be tested without I2C device mocking:
 
 ### Recommended Next Steps
 
-1. **Create GitHub issue for trait-based refactoring** (#37 or similar)
+1. **Create GitHub issue for trait-based refactoring**
    - Define `I2CDeviceInterface` trait
    - Refactor `AppState` to be generic over device type
    - Update all handlers to use trait bounds
