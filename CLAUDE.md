@@ -185,11 +185,22 @@ When implementing features, always verify compatibility with the Python version:
 - Integration tests: Test HTTP API endpoints
 - Hardware tests: Run on actual HALPI2 hardware (see HALPI2-tests/)
 
-### Cross-Compilation
-Cross-compilation is required from the start for development workflow:
-- Development machines may not be ARM64
-- Static musl builds ensure universal compatibility
-- Use `cross` tool for consistent cross-compilation environment
+### Cross-Compilation and Platform Support
+
+**Important**: This daemon is Linux-only. It cannot be built natively on macOS or other platforms due to I2C hardware dependencies (the `i2cdev` crate requires Linux).
+
+**Development Workflow**:
+- **On macOS**: Use `./run build:cross` which compiles FOR Linux (target_os = "linux"), so all Linux-specific code is active
+- **Testing on macOS**: Run tests in Docker container (Linux environment)
+- **On Linux**: Native builds work fine with `./run build`
+
+**Why no cfg(target_os = "linux") guards?**
+- Cross-compilation: When running `cross build --target aarch64-unknown-linux-musl`, the **target** OS is Linux (not the host OS)
+- This means `cfg(target_os = "linux")` is **true** during cross-compilation from macOS
+- Docker tests: Running in Linux container means target_os is Linux
+- Therefore, cfg guards add complexity without benefit
+
+**Native macOS builds**: Will fail with "i2cdev::linux not found" - this is expected and correct behavior for Linux-only software.
 
 ## File Structure
 
