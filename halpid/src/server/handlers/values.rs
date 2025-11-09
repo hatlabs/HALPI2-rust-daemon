@@ -4,13 +4,16 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+#[cfg(target_os = "linux")]
 use halpi_common::protocol::kelvin_to_celsius;
+#[cfg(target_os = "linux")]
 use serde_json::Value;
 use serde_json::json;
 
 use crate::server::app::AppState;
 
 /// GET /values - Get all sensor readings and device information
+#[cfg(target_os = "linux")]
 pub async fn get_all_values(State(state): State<AppState>) -> Response {
     // Acquire device lock and read all values at once to minimize lock time
     let mut device = state.device.lock().await;
@@ -62,6 +65,7 @@ pub async fn get_all_values(State(state): State<AppState>) -> Response {
 }
 
 /// Helper function to check if a key requires device access
+#[cfg(target_os = "linux")]
 fn requires_device_access(key: &str) -> bool {
     matches!(
         key,
@@ -79,6 +83,7 @@ fn requires_device_access(key: &str) -> bool {
 }
 
 /// GET /values/:key - Get a specific value by key
+#[cfg(target_os = "linux")]
 pub async fn get_value(State(state): State<AppState>, Path(key): Path<String>) -> Response {
     // Handle daemon_version without device access
     if key == "daemon_version" {
@@ -145,7 +150,28 @@ pub async fn get_value(State(state): State<AppState>, Path(key): Path<String>) -
     }
 }
 
+/// Stub for non-Linux platforms
+#[cfg(not(target_os = "linux"))]
+pub async fn get_all_values(State(_state): State<AppState>) -> Response {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(json!({"error": "I2C device access only supported on Linux"})),
+    )
+        .into_response()
+}
+
+/// Stub for non-Linux platforms
+#[cfg(not(target_os = "linux"))]
+pub async fn get_value(State(_state): State<AppState>, Path(_key): Path<String>) -> Response {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(json!({"error": "I2C device access only supported on Linux"})),
+    )
+        .into_response()
+}
+
 #[cfg(test)]
+#[cfg(target_os = "linux")]
 mod tests {
     use super::*;
     use crate::i2c::device::HalpiDevice;

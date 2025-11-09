@@ -3,13 +3,17 @@
 use std::path::Path;
 use tracing::info;
 
+#[cfg(target_os = "linux")]
 use std::sync::Arc;
+#[cfg(target_os = "linux")]
 use tokio::sync::Mutex;
+#[cfg(target_os = "linux")]
 use tracing::warn;
 
 #[cfg(unix)]
 use tokio::signal::unix::{SignalKind, signal};
 
+#[cfg(target_os = "linux")]
 use crate::i2c::HalpiDevice;
 
 /// Wait for SIGINT or SIGTERM signal
@@ -47,6 +51,7 @@ pub async fn wait_for_signal() {
 /// - Disables the hardware watchdog (critical for safety)
 /// - Removes the Unix socket file
 /// - Flushes logs
+#[cfg(target_os = "linux")]
 pub async fn cleanup(device: Arc<Mutex<HalpiDevice>>, socket_path: &Path) {
     info!("Running cleanup before shutdown");
 
@@ -70,5 +75,16 @@ pub async fn cleanup(device: Arc<Mutex<HalpiDevice>>, socket_path: &Path) {
     }
 
     // Flush logs (tracing handles this automatically on drop)
+    info!("Cleanup complete");
+}
+
+/// Stub cleanup for non-Linux platforms
+#[cfg(not(target_os = "linux"))]
+pub async fn cleanup(_socket_path: &Path) {
+    info!("Running cleanup before shutdown");
+    // Just remove socket if it exists
+    if _socket_path.exists() {
+        let _ = std::fs::remove_file(_socket_path);
+    }
     info!("Cleanup complete");
 }

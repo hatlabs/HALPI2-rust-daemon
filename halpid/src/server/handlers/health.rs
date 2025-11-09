@@ -36,6 +36,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
+    #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn test_version_endpoint() {
         use crate::i2c::device::HalpiDevice;

@@ -9,6 +9,7 @@ use serde_json::json;
 use crate::server::app::AppState;
 
 /// GET /usb - Get all USB port states
+#[cfg(target_os = "linux")]
 pub async fn get_all_usb(State(state): State<AppState>) -> Response {
     let mut device = state.device.lock().await;
 
@@ -31,6 +32,7 @@ pub async fn get_all_usb(State(state): State<AppState>) -> Response {
 }
 
 /// GET /usb/:port - Get specific USB port state
+#[cfg(target_os = "linux")]
 pub async fn get_usb(State(state): State<AppState>, Path(port): Path<u8>) -> Response {
     if port > 3 {
         return (
@@ -58,6 +60,7 @@ pub async fn get_usb(State(state): State<AppState>, Path(port): Path<u8>) -> Res
 /// PUT /usb - Set all USB port states
 ///
 /// Only updates the ports specified in the payload. Unspecified ports retain their current state.
+#[cfg(target_os = "linux")]
 pub async fn put_all_usb(
     State(state): State<AppState>,
     Json(payload): Json<serde_json::Value>,
@@ -124,6 +127,7 @@ pub async fn put_all_usb(
 }
 
 /// PUT /usb/:port - Set specific USB port state
+#[cfg(target_os = "linux")]
 pub async fn put_usb(
     State(state): State<AppState>,
     Path(port): Path<u8>,
@@ -169,7 +173,52 @@ pub async fn put_usb(
     }
 }
 
+/// Stubs for non-Linux platforms
+#[cfg(not(target_os = "linux"))]
+pub async fn get_all_usb(State(_state): State<AppState>) -> Response {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(json!({"error": "I2C device access only supported on Linux"})),
+    )
+        .into_response()
+}
+
+#[cfg(not(target_os = "linux"))]
+pub async fn get_usb(State(_state): State<AppState>, Path(_port): Path<u8>) -> Response {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(json!({"error": "I2C device access only supported on Linux"})),
+    )
+        .into_response()
+}
+
+#[cfg(not(target_os = "linux"))]
+pub async fn put_all_usb(
+    State(_state): State<AppState>,
+    Json(_payload): Json<serde_json::Value>,
+) -> Response {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(json!({"error": "I2C device access only supported on Linux"})),
+    )
+        .into_response()
+}
+
+#[cfg(not(target_os = "linux"))]
+pub async fn put_usb(
+    State(_state): State<AppState>,
+    Path(_port): Path<u8>,
+    Json(_payload): Json<bool>,
+) -> Response {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(json!({"error": "I2C device access only supported on Linux"})),
+    )
+        .into_response()
+}
+
 #[cfg(test)]
+#[cfg(target_os = "linux")]
 mod tests {
     use super::*;
     use crate::i2c::device::HalpiDevice;

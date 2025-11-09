@@ -7,6 +7,7 @@ use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+#[cfg(target_os = "linux")]
 use chrono::TimeZone;
 
 use crate::server::app::AppState;
@@ -22,6 +23,7 @@ pub enum StandbyRequest {
 }
 
 /// POST /shutdown - Request system shutdown
+#[cfg(target_os = "linux")]
 pub async fn post_shutdown(State(state): State<AppState>) -> Response {
     let mut device = state.device.lock().await;
 
@@ -36,6 +38,7 @@ pub async fn post_shutdown(State(state): State<AppState>) -> Response {
 }
 
 /// POST /standby - Request system standby with wakeup
+#[cfg(target_os = "linux")]
 pub async fn post_standby(
     State(state): State<AppState>,
     Json(payload): Json<StandbyRequest>,
@@ -116,6 +119,7 @@ pub async fn post_standby(
 }
 
 /// Parse ISO 8601 datetime string to Unix timestamp
+#[cfg(target_os = "linux")]
 fn parse_datetime(datetime: &str) -> Result<u64, String> {
     // Try parsing with different formats
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(datetime) {
@@ -137,7 +141,30 @@ fn parse_datetime(datetime: &str) -> Result<u64, String> {
     }
 }
 
+/// Stubs for non-Linux platforms
+#[cfg(not(target_os = "linux"))]
+pub async fn post_shutdown(State(_state): State<AppState>) -> Response {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(json!({"error": "I2C device access only supported on Linux"})),
+    )
+        .into_response()
+}
+
+#[cfg(not(target_os = "linux"))]
+pub async fn post_standby(
+    State(_state): State<AppState>,
+    Json(_payload): Json<StandbyRequest>,
+) -> Response {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(json!({"error": "I2C device access only supported on Linux"})),
+    )
+        .into_response()
+}
+
 #[cfg(test)]
+#[cfg(target_os = "linux")]
 mod tests {
     use super::*;
     use crate::i2c::device::HalpiDevice;

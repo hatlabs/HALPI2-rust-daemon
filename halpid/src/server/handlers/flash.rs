@@ -9,6 +9,7 @@ use serde_json::json;
 use crate::server::app::AppState;
 
 /// POST /flash - Upload firmware to device
+#[cfg(target_os = "linux")]
 pub async fn post_flash(State(state): State<AppState>, mut multipart: Multipart) -> Response {
     // Block size for firmware upload (4KB)
     const FLASH_BLOCK_SIZE: usize = 4096;
@@ -81,6 +82,7 @@ pub async fn post_flash(State(state): State<AppState>, mut multipart: Multipart)
 }
 
 /// Extract firmware data from multipart form
+#[cfg(target_os = "linux")]
 async fn extract_firmware(multipart: &mut Multipart) -> Result<Vec<u8>, String> {
     while let Some(field) = multipart
         .next_field()
@@ -101,7 +103,18 @@ async fn extract_firmware(multipart: &mut Multipart) -> Result<Vec<u8>, String> 
     Err("No 'firmware' field found in multipart form".to_string())
 }
 
+/// Stub for non-Linux platforms
+#[cfg(not(target_os = "linux"))]
+pub async fn post_flash(State(_state): State<AppState>, _multipart: Multipart) -> Response {
+    (
+        StatusCode::NOT_IMPLEMENTED,
+        Json(json!({"error": "I2C device access only supported on Linux"})),
+    )
+        .into_response()
+}
+
 #[cfg(test)]
+#[cfg(target_os = "linux")]
 mod tests {
     // No tests needed for flash handler - integration testing required with actual hardware
 }

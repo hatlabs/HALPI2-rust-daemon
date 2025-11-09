@@ -1,13 +1,20 @@
 //! State machine implementation for power management
 
+#[cfg(target_os = "linux")]
 use std::sync::Arc;
+#[cfg(target_os = "linux")]
 use std::time::Instant;
+#[cfg(target_os = "linux")]
 use tokio::sync::{Mutex, RwLock};
+#[cfg(target_os = "linux")]
 use tokio::time::{Duration, interval};
+#[cfg(target_os = "linux")]
 use tracing::{error, info, warn};
 
+#[cfg(target_os = "linux")]
 use halpi_common::config::Config;
 
+#[cfg(target_os = "linux")]
 use crate::i2c::HalpiDevice;
 
 /// Watchdog timeout in milliseconds (10 seconds)
@@ -16,6 +23,7 @@ use crate::i2c::HalpiDevice;
 /// to ensure the watchdog is fed before timeout. The 10-second value provides
 /// sufficient margin for normal operation while being short enough to safely
 /// power down the system if the daemon becomes unresponsive.
+#[cfg(target_os = "linux")]
 const WATCHDOG_TIMEOUT_MS: u16 = 10000;
 
 /// State machine polling interval in milliseconds (100ms)
@@ -23,6 +31,7 @@ const WATCHDOG_TIMEOUT_MS: u16 = 10000;
 /// CRITICAL: This 0.1 second interval is essential for responsive power management.
 /// The tight polling loop ensures quick detection of blackout events and timely
 /// watchdog feeding.
+#[cfg(target_os = "linux")]
 const STATE_MACHINE_POLL_INTERVAL_MS: u64 = 100;
 
 /// Daemon state machine states
@@ -41,6 +50,7 @@ pub enum DaemonState {
 }
 
 /// Power management state machine
+#[cfg(target_os = "linux")]
 pub struct StateMachine {
     state: DaemonState,
     device: Arc<Mutex<HalpiDevice>>,
@@ -48,6 +58,7 @@ pub struct StateMachine {
     blackout_start: Option<Instant>,
 }
 
+#[cfg(target_os = "linux")]
 impl StateMachine {
     /// Create a new state machine
     pub fn new(device: Arc<Mutex<HalpiDevice>>, config: Arc<RwLock<Config>>) -> Self {
