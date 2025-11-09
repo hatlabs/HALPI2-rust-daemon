@@ -169,7 +169,7 @@ When implementing features, always verify compatibility with the Python version:
 - Bus: I2C bus 1
 - Address: 0x6d (HALPI2 RP2040 firmware)
 - Registers: See `halpi-common/src/i2c.rs` for register definitions
-- Reference: `halpid/src/i2c.py` in Python implementation
+- Reference: `HALPI2-python-daemon/halpid/src/i2c.py` in Python implementation
 
 ### State Machine Timing
 **CRITICAL**: The state machine polls at **0.1 second intervals**, not 1 second. This is essential for correct power management behavior.
@@ -226,7 +226,7 @@ Cross-compilation is required from the start for development workflow:
 ## Related Projects
 
 - **HALPI2-firmware**: RP2040 embedded firmware (Rust/Embassy) - `/Users/mairas/w/hatlabs/HALPI2/HALPI2-firmware/`
-- **halpid**: Python daemon (reference implementation) - `/Users/mairas/w/hatlabs/HALPI2/halpid/`
+- **HALPI2-python-daemon**: Python daemon (reference implementation) - `/Users/mairas/w/hatlabs/HALPI2/HALPI2-python-daemon/`
 - **HALPI2-tests**: Hardware production tests - `/Users/mairas/w/hatlabs/HALPI2/HALPI2-tests/`
 - **halpi2**: User documentation - `/Users/mairas/w/hatlabs/HALPI2/halpi2/`
 
@@ -235,7 +235,7 @@ Cross-compilation is required from the start for development workflow:
 - Product page: https://shop.hatlabs.fi/products/halpi2
 - Documentation: https://docs.hatlabs.fi/halpi2
 - GitHub Issues: https://github.com/hatlabs/HALPI2-rust-daemon/issues
-- Python Reference: `/Users/mairas/w/hatlabs/HALPI2/halpid/`
+- Python Reference: `/Users/mairas/w/hatlabs/HALPI2/HALPI2-python-daemon/`
 - Firmware Reference: `/Users/mairas/w/hatlabs/HALPI2/HALPI2-firmware/`
 
 ## Important Constraints

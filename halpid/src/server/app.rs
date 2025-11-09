@@ -5,19 +5,16 @@ use halpi_common::config::Config;
 use halpi_common::error::{AppError, ServerError};
 use std::path::Path;
 use std::sync::Arc;
-#[cfg(target_os = "linux")]
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use tower_http::trace::TraceLayer;
 
-#[cfg(target_os = "linux")]
 use crate::i2c::device::HalpiDevice;
 
 /// Shared application state accessible to all handlers
 #[derive(Clone)]
 pub struct AppState {
     /// I2C device interface (mutex-protected for exclusive access)
-    #[cfg(target_os = "linux")]
     pub device: Arc<Mutex<HalpiDevice>>,
     /// Configuration (read-write lock for concurrent reads)
     pub config: Arc<RwLock<Config>>,
@@ -27,7 +24,6 @@ pub struct AppState {
 
 impl AppState {
     /// Create new application state
-    #[cfg(target_os = "linux")]
     pub fn new(device: Arc<Mutex<HalpiDevice>>, config: Arc<RwLock<Config>>) -> Self {
         Self {
             device,
@@ -38,7 +34,6 @@ impl AppState {
 }
 
 /// Run the HTTP server on a Unix socket
-#[cfg(target_os = "linux")]
 pub async fn run_server(state: AppState) -> anyhow::Result<()> {
     use std::path::PathBuf;
     use tokio::net::UnixListener;
@@ -187,7 +182,6 @@ fn set_socket_group(socket_path: &Path, group_name: &str) -> Result<(), AppError
 }
 
 #[cfg(test)]
-#[cfg(target_os = "linux")]
 mod tests {
     use super::*;
 
