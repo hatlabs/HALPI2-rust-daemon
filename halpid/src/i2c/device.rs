@@ -87,11 +87,12 @@ impl HalpiDevice {
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
     fn read_bytes(&mut self, reg: u8, count: usize) -> Result<Vec<u8>, I2cError> {
         self.retry_operation(|device| {
-            let mut buffer = vec![0u8; count];
-            device
-                .write(&[reg])
-                .and_then(|_| device.read(&mut buffer))
+            // Use SMBus block read which does a combined write-read transaction
+            // This is equivalent to Python's read_i2c_block_data()
+            let buffer = device
+                .smbus_read_i2c_block_data(reg, count as u8)
                 .map_err(|e| I2cError::Read { reg, source: e })?;
+            tracing::debug!("Read reg 0x{:02x}: {:02x?}", reg, buffer);
             Ok(buffer)
         })
     }
