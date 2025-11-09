@@ -58,6 +58,9 @@ pub async fn run_server(state: AppState) -> anyhow::Result<()> {
 
     let listener = UnixListener::bind(&socket_path)?;
 
+    // Set socket permissions and group ownership
+    setup_socket_permissions(&socket_path, "adm").await?;
+
     tracing::info!("HTTP server listening on {}", socket_path.display());
 
     let app = create_app(state);
@@ -79,11 +82,11 @@ pub fn create_app(state: AppState) -> Router {
         .route("/version", axum::routing::get(health::version))
         // Values endpoints
         .route("/values", axum::routing::get(values::get_all_values))
-        .route("/values/:key", axum::routing::get(values::get_value))
+        .route("/values/{key}", axum::routing::get(values::get_value))
         // Configuration endpoints
         .route("/config", axum::routing::get(config::get_all_config))
         .route(
-            "/config/:key",
+            "/config/{key}",
             axum::routing::get(config::get_config).put(config::put_config),
         )
         // Shutdown and standby endpoints
@@ -95,7 +98,7 @@ pub fn create_app(state: AppState) -> Router {
             axum::routing::get(usb::get_all_usb).put(usb::put_all_usb),
         )
         .route(
-            "/usb/:port",
+            "/usb/{port}",
             axum::routing::get(usb::get_usb).put(usb::put_usb),
         )
         // Firmware upload endpoint
