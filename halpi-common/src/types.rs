@@ -57,9 +57,12 @@ impl Version {
         self.alpha == 255
     }
 
-    /// Check if this is an unavailable version (major = 0xFF)
+    /// Check if this is an unavailable version
+    /// - major = 0xFF indicates firmware not present
+    /// - [0, 0, 255, 255] indicates unprogrammed hardware version
     pub fn is_unavailable(&self) -> bool {
         self.major == 255
+            || (self.major == 0 && self.minor == 0 && self.patch == 255 && self.alpha == 255)
     }
 }
 
@@ -217,9 +220,15 @@ mod tests {
 
     #[test]
     fn test_version_unavailable() {
+        // Major = 0xFF indicates firmware not present
         let version = Version::from_bytes([255, 0, 0, 0]);
         assert_eq!(version.to_string(), "N/A");
         assert!(version.is_unavailable());
+
+        // [0, 0, 255, 255] indicates unprogrammed hardware version
+        let version_unprogrammed = Version::from_bytes([0, 0, 255, 255]);
+        assert_eq!(version_unprogrammed.to_string(), "N/A");
+        assert!(version_unprogrammed.is_unavailable());
     }
 
     #[test]
