@@ -19,10 +19,10 @@ enum Commands {
     Status,
     /// Display version information
     Version,
-    /// Get configuration values
+    /// Get or set configuration values
     Config {
-        /// Configuration key to get
-        key: Option<String>,
+        #[command(subcommand)]
+        action: Option<ConfigAction>,
     },
     /// Shutdown or standby the system
     Shutdown {
@@ -42,6 +42,22 @@ enum Commands {
     Flash {
         /// Path to firmware binary file
         firmware: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConfigAction {
+    /// Get a configuration value
+    Get {
+        /// Configuration key to get
+        key: String,
+    },
+    /// Set a configuration value
+    Set {
+        /// Configuration key to set
+        key: String,
+        /// Value to set
+        value: String,
     },
 }
 
@@ -69,13 +85,13 @@ async fn main() {
             println!("halpi version {}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
-        Some(Commands::Config { key }) => {
-            if let Some(k) = key {
-                commands::config::config_get(&k).await
-            } else {
-                commands::config::config_get_all().await
+        Some(Commands::Config { action }) => match action {
+            Some(ConfigAction::Get { key }) => commands::config::config_get(&key).await,
+            Some(ConfigAction::Set { key, value }) => {
+                commands::config::config_set(&key, &value).await
             }
-        }
+            None => commands::config::config_get_all().await,
+        },
         Some(Commands::Shutdown { standby, time }) => {
             if standby {
                 // Clap enforces that time is present when standby is true (via requires attribute)
@@ -131,18 +147,36 @@ mod tests {
     fn test_cli_config_all() {
         let cli = Cli::try_parse_from(["halpi", "config"]).unwrap();
         match cli.command {
-            Some(Commands::Config { key }) => assert!(key.is_none()),
+            Some(Commands::Config { action }) => assert!(action.is_none()),
             _ => panic!("Expected Config command"),
         }
     }
 
     #[test]
-    fn test_cli_config_with_key() {
-        let cli = Cli::try_parse_from(["halpi", "config", "blackout-time-limit"]).unwrap();
+    fn test_cli_config_get() {
+        let cli = Cli::try_parse_from(["halpi", "config", "get", "watchdog_timeout"]).unwrap();
         match cli.command {
-            Some(Commands::Config { key }) => {
-                assert_eq!(key, Some("blackout-time-limit".to_string()))
-            }
+            Some(Commands::Config { action }) => match action {
+                Some(ConfigAction::Get { key }) => {
+                    assert_eq!(key, "watchdog_timeout");
+                }
+                _ => panic!("Expected Get action"),
+            },
+            _ => panic!("Expected Config command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_config_set() {
+        let cli = Cli::try_parse_from(["halpi", "config", "set", "led_brightness", "100"]).unwrap();
+        match cli.command {
+            Some(Commands::Config { action }) => match action {
+                Some(ConfigAction::Set { key, value }) => {
+                    assert_eq!(key, "led_brightness");
+                    assert_eq!(value, "100");
+                }
+                _ => panic!("Expected Set action"),
+            },
             _ => panic!("Expected Config command"),
         }
     }
