@@ -155,24 +155,24 @@ The configuration file format is **identical**, but here are the supported field
 ### Python 4.x
 
 ```yaml
-i2c_bus: 1
-i2c_addr: 0x6D
-blackout_time_limit: 10.0
-blackout_voltage_limit: 9.0
+i2c-bus: 1
+i2c-addr: 0x6D
+blackout-time-limit: 10.0
+blackout-voltage-limit: 9.0
 socket: /run/halpid/halpid.sock
-socket_group: adm
+socket-group: adm
 poweroff: /sbin/poweroff
 ```
 
 ### Rust 5.x
 
 ```yaml
-i2c_bus: 1
-i2c_addr: 0x6D
-blackout_time_limit: 10.0
-blackout_voltage_limit: 9.0
+i2c-bus: 1
+i2c-addr: 0x6D
+blackout-time-limit: 10.0
+blackout-voltage-limit: 9.0
 socket: /run/halpid/halpid.sock
-socket_group: adm
+socket-group: adm
 poweroff: /sbin/poweroff
 ```
 
@@ -229,7 +229,7 @@ halpi config            halpi config         # ✅ Same
 halpi config KEY        halpi config KEY     # ✅ Same
 halpi usb               halpi usb            # ✅ Same
 halpi usb enable 0      halpi usb enable 0   # ✅ Same
-halpi usb disable all   halpi usb disable all# ✅ Same
+halpi usb disable all   halpi usb disable all # ✅ Same
 halpi shutdown          halpi shutdown       # ✅ Same
 halpi shutdown --standby --time 300          # ✅ Same
 halpi flash firmware.bin halpi flash firmware.bin # ✅ Same

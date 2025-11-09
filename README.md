@@ -54,15 +54,20 @@ sudo systemctl status halpid
 git clone https://github.com/hatlabs/HALPI2-rust-daemon.git
 cd HALPI2-rust-daemon
 
-# Build release version for ARM64
-./run build:cross --release
-
-# Or build for current architecture
+# Build for current architecture
 ./run build --release
 
+# Or cross-compile for ARM64 (Raspberry Pi)
+./run build:cross --release
+
 # Install binaries
+# For native build:
 sudo cp target/release/halpid /usr/bin/
 sudo cp target/release/halpi /usr/bin/
+
+# For cross-compiled binaries:
+# sudo cp target/aarch64-unknown-linux-musl/release/halpid /usr/bin/
+# sudo cp target/aarch64-unknown-linux-musl/release/halpi /usr/bin/
 
 # Install systemd service
 sudo cp systemd/halpid.service /etc/systemd/system/
@@ -130,16 +135,16 @@ Configuration file: `/etc/halpid/halpid.conf` (YAML format)
 
 ```yaml
 # I2C bus configuration
-i2c_bus: 1
-i2c_addr: 0x6D
+i2c-bus: 1
+i2c-addr: 0x6D
 
 # Blackout detection thresholds
-blackout_time_limit: 10.0      # seconds
-blackout_voltage_limit: 9.0    # volts
+blackout-time-limit: 10.0      # seconds
+blackout-voltage-limit: 9.0    # volts
 
 # Unix socket for HTTP API
 socket: /run/halpid/halpid.sock
-socket_group: adm
+socket-group: adm
 
 # Shutdown command (empty string for dry-run testing)
 poweroff: /sbin/poweroff
