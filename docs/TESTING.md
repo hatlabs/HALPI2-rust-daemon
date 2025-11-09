@@ -156,8 +156,112 @@ cargo test test_cli_verify
 5. **Use descriptive names**: Test names should clearly describe what is being tested
 6. **Test error cases**: Don't just test the happy path
 
+## Integration Testing Strategy
+
+### Current Limitations
+
+The current architecture presents challenges for comprehensive integration testing:
+
+**Tight Coupling to Hardware**:
+- `AppState` directly contains `HalpiDevice` (concrete type, not a trait)
+- All HTTP handlers depend on `AppState` with real I2C device
+- No dependency injection mechanism for mocking I2C operations
+
+**Required Refactoring for Full Integration Tests**:
+
+To enable comprehensive integration testing without hardware, the codebase needs:
+
+1. **Trait-based I2C Device Interface**:
+   ```rust
+   pub trait I2CDeviceInterface {
+       fn get_measurements(&mut self) -> Result<Measurements, I2cError>;
+       fn feed_watchdog(&mut self) -> Result<(), I2cError>;
+       // ... other methods
+   }
+   ```
+
+2. **Generic AppState**:
+   ```rust
+   pub struct AppState<D: I2CDeviceInterface> {
+       pub device: Arc<Mutex<D>>,
+       pub config: Arc<RwLock<Config>>,
+       pub version: &'static str,
+   }
+   ```
+
+3. **Mock Implementation**:
+   ```rust
+   pub struct MockI2CDevice {
+       // Configurable responses for testing
+   }
+
+   impl I2CDeviceInterface for MockI2CDevice {
+       // Return predetermined test data
+   }
+   ```
+
+This refactoring would enable:
+- Testing all HTTP endpoints without hardware
+- Testing state machine behavior with controlled I2C responses
+- Testing error handling paths
+- Fast, deterministic integration tests
+
+### Current Integration Test Approach
+
+Until the trait-based refactoring is complete, integration tests use this pattern:
+
+```rust
+#[tokio::test]
+async fn test_endpoint() {
+    // Skip test if I2C hardware not available
+    let device = match HalpiDevice::new(1, 0x6D) {
+        Ok(d) => Arc::new(Mutex::new(d)),
+        Err(_) => return,  // Gracefully skip on CI/dev machines
+    };
+
+    // Test with real hardware when available
+    // ...
+}
+```
+
+This allows:
+- ✅ Tests run on actual hardware when available
+- ✅ Tests gracefully skip in CI/dev environments
+- ✅ Basic endpoint validation
+- ❌ Cannot test error paths systematically
+- ❌ Cannot control I2C device state
+- ❌ Cannot test without hardware
+
+### Testable Endpoints Without I2C
+
+Some endpoints can be tested without I2C device mocking:
+
+- ✅ `/` (health check) - No I2C dependency
+- ✅ `/version` - Only reads from AppState (needs minimal setup)
+- ⚠️ `/config` - Reads/writes config (needs AppState but not I2C operations)
+
+### Recommended Next Steps
+
+1. **Create GitHub issue for trait-based refactoring**
+   - Define `I2CDeviceInterface` trait
+   - Refactor `AppState` to be generic over device type
+   - Update all handlers to use trait bounds
+   - Create `MockI2CDevice` implementation
+
+2. **Implement integration tests after refactoring**:
+   - HTTP API endpoint tests with mock device
+   - State machine tests with controlled I2C responses
+   - Error path testing
+   - CLI integration tests
+
+3. **Keep hardware tests separate**:
+   - Production testing on real hardware remains in `HALPI2-tests/` repository
+   - Integration tests focus on software behavior
+   - Hardware tests focus on electrical characteristics and protocol compliance
+
 ## Notes
 
 - Hardware-dependent code (I2C communication, state machine) cannot be easily unit tested on development machines without I2C hardware
 - The daemon requires root privileges for I2C access, which complicates testing
 - Cross-platform considerations: Some tests may need `#[cfg(target_os = "linux")]` guards
+- **Integration testing blocked on trait-based refactoring** (see Integration Testing Strategy above)
