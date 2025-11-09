@@ -240,8 +240,9 @@ Cross-compilation is required from the start for development workflow:
 
 ## Important Constraints
 
+- **Runtime**: Linux-only (requires I2C device access). Development and testing on macOS is supported via cross-compilation and Docker containers for non-hardware tests.
 - **MSRV**: Rust 1.91+ (required for edition 2024)
-- **Target**: aarch64-unknown-linux-musl only
+- **Target**: aarch64-unknown-linux-musl for deployment, x86_64-unknown-linux-gnu for Linux testing
 - **API Compatibility**: 100% backward compatible with Python halpid 4.x
 - **State Machine**: 0.1 second polling interval
 - **Runs as root**: Required for I2C access and shutdown privileges
