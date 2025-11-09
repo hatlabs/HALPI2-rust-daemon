@@ -128,6 +128,9 @@ function build:docker {
     mcr.microsoft.com/devcontainers/rust:1-bookworm \
     bash -c "
       set -e
+      echo '📦 Updating Rust toolchain...'
+      rustup update stable > /dev/null 2>&1
+      rustup default stable > /dev/null 2>&1
       echo '📦 Installing ARM64 target...'
       rustup target add aarch64-unknown-linux-musl
       echo '🔨 Running cargo build $build_args...'
@@ -157,6 +160,10 @@ function build:docker:cross {
     mcr.microsoft.com/devcontainers/rust:1-bookworm \
     bash -c "
       set -e
+      echo '📦 Updating Rust toolchain...'
+      rustup update stable > /dev/null 2>&1
+      rustup default stable > /dev/null 2>&1
+
       echo '📦 Installing Docker CLI for cross...'
       apt-get update -qq && apt-get install -y -qq docker.io > /dev/null 2>&1
 
@@ -191,8 +198,8 @@ function package:deb:docker {
     bash -c "
       set -e
       echo '📦 Updating Rust toolchain...'
-      rustup update stable
-      rustup default stable
+      rustup update stable > /dev/null 2>&1
+      rustup default stable > /dev/null 2>&1
 
       echo '📦 Installing ARM64 cross-compilation toolchain...'
       apt-get update -qq && apt-get install -y -qq gcc-aarch64-linux-gnu > /dev/null 2>&1
