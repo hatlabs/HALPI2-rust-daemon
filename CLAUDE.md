@@ -10,20 +10,41 @@ HALPI2 Rust Daemon is a reimplementation of the HALPI2 power monitor and watchdo
 
 **IMPORTANT**: This is a Linux-only daemon. Use one of these approaches for development:
 
-### Option 1: Dev Container (Recommended for macOS)
+### Option 1: Docker Build Commands (Recommended for macOS)
+Use the Docker-based build commands for automatic Linux environment:
+```bash
+# Build in dev container (no manual setup needed)
+./run build:docker [--release]
+
+# Cross-compile for ARM64 (for deployment to Raspberry Pi)
+./run build:docker:cross [--release]
+
+# Build Debian package for ARM64
+./run package:deb:docker
+```
+
+**How it works:**
+- Automatically pulls and runs a Docker container with the Rust toolchain
+- Uses `--platform linux/amd64` to ensure correct architecture
+- Installs necessary tools (ARM64 target, cross, cargo-deb)
+- Builds the project in a full Linux environment
+- Requires Docker to be installed and running
+
+### Option 2: Dev Container (VSCode)
 Open the project in VSCode and select "Reopen in Container". This provides:
 - Full Linux environment for native builds and testing
 - Pre-configured Rust toolchain with ARM64 cross-compilation support
 - All tools pre-installed (`cross`, `cargo-deb`, `gh`)
+- Interactive development with shell access
 
-### Option 2: Cross-Compilation (Limited)
+### Option 3: Local Cross-Compilation (Limited)
 Cross-compilation from macOS works for building but NOT for testing:
 ```bash
 ./run build:cross --release  # Compiles for ARM64 Linux
 ```
-Note: Tests cannot run via cross-compilation - use dev container instead.
+Note: Tests cannot run via cross-compilation - use Option 1 or 2 instead.
 
-### Option 3: Native Linux
+### Option 4: Native Linux
 If running on Linux, all commands work natively without containers.
 
 ## Development Commands
@@ -39,7 +60,12 @@ Use the `./run` script for all development tasks:
 - `./run fmt` - Format code with rustfmt
 - `./run fmt:check` - Check code formatting
 
-### Cross-Compilation
+### Docker Build (for macOS development)
+- `./run build:docker [--release]` - Build in Docker container (Linux environment)
+- `./run build:docker:cross [--release]` - Cross-compile for ARM64 in Docker
+- `./run package:deb:docker` - Build Debian package for ARM64 in Docker
+
+### Cross-Compilation (native Linux or macOS with limitations)
 - `./run build:cross [--release]` - Build for ARM64 Linux (aarch64-unknown-linux-musl)
 - `./run cross:setup` - Install cross-compilation tools
 
@@ -65,13 +91,19 @@ Use the `./run` script for all development tasks:
 
 ### Common Workflows
 ```bash
-# Development cycle
+# Development cycle (native Linux)
 ./run build && ./run dev:daemon
+
+# Development on macOS (Docker)
+./run build:docker && echo "Run daemon inside VSCode devcontainer"
 
 # Full check before commit
 ./run ci:check
 
-# Build release for Raspberry Pi
+# Build release for Raspberry Pi (on macOS)
+./run package:deb:docker
+
+# Build release for Raspberry Pi (native Linux)
 ./run build:cross --release
 ./run package:deb:cross
 
