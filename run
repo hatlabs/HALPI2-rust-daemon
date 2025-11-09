@@ -166,21 +166,32 @@ function build:docker:cross {
   # Detect host architecture for platform selection
   local arch=$(uname -m)
   local platform=""
+  local cache_suffix=""
   case "$arch" in
-    arm64|aarch64) platform="linux/arm64" ;;
-    x86_64|amd64) platform="linux/amd64" ;;
-    *) platform="linux/amd64" ;;  # Default to amd64 if unknown
+    arm64|aarch64)
+      platform="linux/arm64"
+      cache_suffix="arm64"
+      ;;
+    x86_64|amd64)
+      platform="linux/amd64"
+      cache_suffix="amd64"
+      ;;
+    *)
+      platform="linux/amd64"
+      cache_suffix="amd64"
+      ;;
   esac
 
-  # Create Docker volume for cargo cache if it doesn't exist
-  docker volume create halpi2-cargo-cache > /dev/null 2>&1 || true
+  # Create architecture-specific Docker volume for cargo cache
+  local cache_volume="halpi2-cargo-cache-${cache_suffix}"
+  docker volume create "$cache_volume" > /dev/null 2>&1 || true
 
   docker run --rm \
     --platform "$platform" \
     -v "$(pwd):/workspace" \
     -w /workspace \
     -v /var/run/docker.sock:/var/run/docker.sock \
-    -v halpi2-cargo-cache:/cargo-cache \
+    -v "${cache_volume}:/cargo-cache" \
     mcr.microsoft.com/devcontainers/rust:1-bookworm \
     bash -c "
       set -e
@@ -229,20 +240,31 @@ function package:deb:docker {
   # Detect host architecture for platform selection
   local arch=$(uname -m)
   local platform=""
+  local cache_suffix=""
   case "$arch" in
-    arm64|aarch64) platform="linux/arm64" ;;
-    x86_64|amd64) platform="linux/amd64" ;;
-    *) platform="linux/amd64" ;;  # Default to amd64 if unknown
+    arm64|aarch64)
+      platform="linux/arm64"
+      cache_suffix="arm64"
+      ;;
+    x86_64|amd64)
+      platform="linux/amd64"
+      cache_suffix="amd64"
+      ;;
+    *)
+      platform="linux/amd64"
+      cache_suffix="amd64"
+      ;;
   esac
 
-  # Create Docker volume for cargo cache if it doesn't exist
-  docker volume create halpi2-cargo-cache > /dev/null 2>&1 || true
+  # Create architecture-specific Docker volume for cargo cache
+  local cache_volume="halpi2-cargo-cache-${cache_suffix}"
+  docker volume create "$cache_volume" > /dev/null 2>&1 || true
 
   docker run --rm \
     --platform "$platform" \
     -v "$(pwd):/workspace" \
     -w /workspace \
-    -v halpi2-cargo-cache:/cargo-cache \
+    -v "${cache_volume}:/cargo-cache" \
     mcr.microsoft.com/devcontainers/rust:1-bookworm \
     bash -c "
       set -e
@@ -484,8 +506,9 @@ cmd=${cmd//-/:}
 
 # Check if function exists
 if declare -f "$cmd" > /dev/null; then
-  # Run the command
-  "$cmd" "$@"
+  # Run the command with timing
+  TIMEFORMAT=$'\nTask completed in %3lR'
+  time "$cmd" "$@"
 else
   echo "Error: Unknown command '$cmd'"
   echo
