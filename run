@@ -115,25 +115,30 @@ function test:coverage {
 ################################################################################
 # Docker-based Build Commands (for macOS/non-Linux development)
 
-# Helper function to detect host architecture and return platform + cache suffix
+# Helper function to detect host architecture
+# Returns platform and cache suffix separated by colon (e.g., 'linux/arm64:arm64')
 _detect_docker_platform() {
   local arch=$(uname -m)
   case "$arch" in
     arm64|aarch64) echo "linux/arm64:arm64" ;;
     x86_64|amd64) echo "linux/amd64:amd64" ;;
-    *) echo "linux/amd64:amd64" ;;  # Default to amd64 if unknown
+    *)
+      echo "⚠️  Unknown architecture: $arch, defaulting to amd64" >&2
+      echo "linux/amd64:amd64"
+      ;;
   esac
 }
 
 function build:docker {
   #@ Build in Docker container (automatic Linux environment)
+  #@ Usage: build:docker [--release]
   #@ Category: Docker Build
   local build_args="$@"
 
   echo "🏗️  Building in Docker container..."
 
   # Detect host architecture for platform selection
-  IFS=':' read -r platform cache_suffix <<< "$(_detect_docker_platform)"
+  IFS=':' read -r platform _ <<< "$(_detect_docker_platform)"
 
   docker run --rm \
     --platform "$platform" \
@@ -145,18 +150,12 @@ function build:docker {
       echo '🔨 Running cargo build $build_args...'
       cargo build $build_args
       echo '✅ Build complete!'
-    "
-
-  if [ $? -eq 0 ]; then
-    echo "✅ Build successful in Docker container"
-  else
-    echo "❌ Build failed"
-    return 1
-  fi
+    " && echo "✅ Build successful in Docker container"
 }
 
 function build:docker:cross {
-  #@ Build for ARM64 in Docker container using cross
+  #@ Cross-compile for ARM64 Linux using cross
+  #@ Usage: build:docker:cross [--release]
   #@ Category: Docker Build
   local build_args="$@"
 
@@ -165,8 +164,8 @@ function build:docker:cross {
   # Detect host architecture for platform selection
   IFS=':' read -r platform cache_suffix <<< "$(_detect_docker_platform)"
 
-  # Create architecture-specific Docker volume for cargo cache
-  local cache_volume="halpi2-cargo-cache-${cache_suffix}"
+  # Create architecture-specific Docker volume for cargo cache (dynamic project name)
+  local cache_volume="$(basename "$(pwd)")-cargo-cache-${cache_suffix}"
   docker volume create "$cache_volume" > /dev/null 2>&1 || true
 
   # SECURITY WARNING: Mounting /var/run/docker.sock grants full Docker daemon access,
@@ -182,10 +181,10 @@ function build:docker:cross {
     bash -c "
       set -e
       echo '📦 Installing Docker CLI for cross...'
-      apt-get update -qq && apt-get install -y -qq docker.io > /dev/null 2>&1
+      apt-get update -qq && apt-get install -y -qq docker.io > /dev/null
 
       echo '📦 Installing cross-compilation tools...'
-      rustup target add aarch64-unknown-linux-musl > /dev/null 2>&1
+      rustup target add aarch64-unknown-linux-musl > /dev/null
 
       # Check if cross is cached, otherwise install it
       if [ -f /cargo-cache/bin/cross ]; then
@@ -194,7 +193,7 @@ function build:docker:cross {
         chmod +x /usr/local/cargo/bin/cross
       else
         echo '   Installing cross (this will be cached)...'
-        cargo install cross --locked 2>&1 | grep -E '(Installing|Installed)' || true
+        cargo install cross --locked | grep -E '(Installing|Installed)' || true
         # Verify cross binary exists after installation
         if [ ! -f /usr/local/cargo/bin/cross ]; then
           echo '❌ Error: cross binary not found after installation!' >&2
@@ -207,19 +206,15 @@ function build:docker:cross {
       echo '🔨 Running cross build for ARM64...'
       cross build --target aarch64-unknown-linux-musl $build_args
       echo '✅ Cross-compilation complete!'
-    "
-
-  if [ $? -eq 0 ]; then
-    echo "✅ ARM64 build successful"
-    echo "   Binaries in: target/aarch64-unknown-linux-musl/"
-  else
-    echo "❌ Build failed"
-    return 1
-  fi
+    " && {
+      echo "✅ ARM64 build successful"
+      echo "   Binaries in: target/aarch64-unknown-linux-musl/"
+    }
 }
 
 function package:deb:docker {
   #@ Build Debian package for ARM64 in Docker container
+  #@ Usage: package:deb:docker
   #@ Category: Docker Build
 
   echo "🏗️  Building Debian package for ARM64 in Docker container..."
@@ -227,8 +222,8 @@ function package:deb:docker {
   # Detect host architecture for platform selection
   IFS=':' read -r platform cache_suffix <<< "$(_detect_docker_platform)"
 
-  # Create architecture-specific Docker volume for cargo cache
-  local cache_volume="halpi2-cargo-cache-${cache_suffix}"
+  # Create architecture-specific Docker volume for cargo cache (dynamic project name)
+  local cache_volume="$(basename "$(pwd)")-cargo-cache-${cache_suffix}"
   docker volume create "$cache_volume" > /dev/null 2>&1 || true
 
   docker run --rm \
@@ -240,7 +235,7 @@ function package:deb:docker {
     bash -c "
       set -e
       echo '📦 Installing ARM64 cross-compilation toolchain...'
-      apt-get update -qq && apt-get install -y -qq gcc-aarch64-linux-gnu > /dev/null 2>&1
+      apt-get update -qq && apt-get install -y -qq gcc-aarch64-linux-gnu > /dev/null
 
       echo '📦 Installing build tools...'
       rustup target add aarch64-unknown-linux-musl
@@ -252,7 +247,7 @@ function package:deb:docker {
         chmod +x /usr/local/cargo/bin/cargo-deb
       else
         echo '   Installing cargo-deb (this will be cached)...'
-        cargo install cargo-deb --locked 2>&1 | grep -E '(Installing|Installed)' || true
+        cargo install cargo-deb --locked | grep -E '(Installing|Installed)' || true
         # Verify cargo-deb binary exists after installation
         if [ ! -f /usr/local/cargo/bin/cargo-deb ]; then
           echo '❌ Error: cargo-deb binary not found after installation!' >&2
@@ -270,21 +265,15 @@ function package:deb:docker {
       cargo deb -p halpid --target aarch64-unknown-linux-musl --no-build
 
       echo '✅ Debian package built!'
-    "
-
-  if [ $? -eq 0 ]; then
-    echo ""
-    echo "✅ Debian package built successfully!"
-    local deb_file=$(ls -t target/aarch64-unknown-linux-musl/debian/*.deb 2>/dev/null | head -1)
-    if [ -n "$deb_file" ]; then
-      echo "   Package: $deb_file"
-      ls -lh "$deb_file"
-    fi
-  else
-    echo ""
-    echo "❌ Package build failed"
-    return 1
-  fi
+    " && {
+      echo ""
+      echo "✅ Debian package built successfully!"
+      local deb_file=$(ls -t target/aarch64-unknown-linux-musl/debian/*.deb 2>/dev/null | head -1)
+      if [ -n "$deb_file" ]; then
+        echo "   Package: $deb_file"
+        ls -lh "$deb_file"
+      fi
+    }
 }
 
 ################################################################################
