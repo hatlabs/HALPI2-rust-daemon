@@ -18,14 +18,13 @@ pub const REG_HARDWARE_VERSION: u8 = 0x03;
 /// Firmware version (4 bytes: major.minor.patch-alpha)
 pub const REG_FIRMWARE_VERSION: u8 = 0x04;
 
-/// 5V output enable state (byte, boolean)
-pub const REG_EN5V_STATE: u8 = 0x10;
+/// Raspberry Pi power state (byte: 0=off, 1=on)
+pub const REG_RASPI_POWER_STATE: u8 = 0x10;
 
 /// Watchdog timeout (word, milliseconds)
-pub const REG_WATCHDOG_TIMEOUT: u8 = 0x11;
-
-/// Watchdog feed command (write any byte)
-pub const REG_WATCHDOG_FEED: u8 = 0x12;
+/// Reading this register returns the current timeout
+/// Writing to this register sets the timeout (0 to disable, non-zero to enable/feed)
+pub const REG_WATCHDOG_TIMEOUT: u8 = 0x12;
 
 /// Power-on threshold (word, analog scaled)
 pub const REG_POWER_ON_THRESHOLD: u8 = 0x13;

@@ -12,17 +12,18 @@ use crate::i2c::HalpiDevice;
 
 /// Watchdog timeout in milliseconds (10 seconds)
 ///
-/// This timeout must be longer than the state machine polling interval (100ms)
-/// to ensure the watchdog is fed before timeout. The 10-second value provides
-/// sufficient margin for normal operation while being short enough to safely
-/// power down the system if the daemon becomes unresponsive.
+/// This timeout must be longer than the state machine polling interval (100ms).
+/// The firmware automatically feeds the watchdog on ANY I2C operation, so our
+/// regular polling (get_measurements every 100ms) keeps it alive. The 10-second
+/// timeout provides sufficient margin while being short enough to safely power
+/// down the system if the daemon becomes unresponsive.
 const WATCHDOG_TIMEOUT_MS: u16 = 10000;
 
 /// State machine polling interval in milliseconds (100ms)
 ///
 /// CRITICAL: This 0.1 second interval is essential for responsive power management.
-/// The tight polling loop ensures quick detection of blackout events and timely
-/// watchdog feeding.
+/// The tight polling loop ensures quick detection of blackout events. Each poll reads
+/// I2C registers, which automatically feeds the watchdog in the firmware.
 const STATE_MACHINE_POLL_INTERVAL_MS: u64 = 100;
 
 /// Daemon state machine states
@@ -113,11 +114,9 @@ impl StateMachine {
                     self.blackout_start = Some(Instant::now());
                     drop(config);
                     self.transition_to(DaemonState::Blackout);
-                } else {
-                    // Feed watchdog in normal operation
-                    let mut device = self.device.lock().await;
-                    device.feed_watchdog()?;
                 }
+                // Note: Watchdog is automatically fed by any I2C operation,
+                // so the get_measurements() call above keeps it alive
             }
 
             DaemonState::Blackout => {
@@ -144,9 +143,7 @@ impl StateMachine {
                     }
                 }
 
-                // Continue feeding watchdog during blackout
-                let mut device = self.device.lock().await;
-                device.feed_watchdog()?;
+                // Note: Watchdog is automatically fed by the get_measurements() call above
             }
 
             DaemonState::Shutdown => {
