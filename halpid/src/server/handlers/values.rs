@@ -39,6 +39,11 @@ pub async fn get_all_values(State(state): State<AppState>) -> Response {
         .get_device_id()
         .unwrap_or_else(|_| "0000000000000000".to_string());
 
+    // Read additional state values
+    let raspi_power_state = device.get_5v_output_enabled().unwrap_or(false);
+    let watchdog_timeout = device.get_watchdog_timeout().unwrap_or(0);
+    let watchdog_enabled = watchdog_timeout > 0;
+
     // Release lock
     drop(device);
 
@@ -54,6 +59,9 @@ pub async fn get_all_values(State(state): State<AppState>) -> Response {
         "T_mcu": measurements.mcu_temperature,
         "T_pcb": measurements.pcb_temperature,
         "state": measurements.power_state.name(),
+        "5v_output_enabled": raspi_power_state,
+        "watchdog_enabled": watchdog_enabled,
+        "watchdog_timeout": watchdog_timeout as f64 / 1000.0, // Convert ms to seconds
         "watchdog_elapsed": measurements.watchdog_elapsed,
     });
 
@@ -73,6 +81,9 @@ fn requires_device_access(key: &str) -> bool {
             | "T_mcu"
             | "T_pcb"
             | "state"
+            | "5v_output_enabled"
+            | "watchdog_enabled"
+            | "watchdog_timeout"
             | "watchdog_elapsed"
     )
 }
@@ -118,6 +129,18 @@ pub async fn get_value(State(state): State<AppState>, Path(key): Path<String>) -
             .get_device_id()
             .map(|id| json!(id))
             .or_else(|_| Ok(json!("0000000000000000"))),
+        "5v_output_enabled" => device
+            .get_5v_output_enabled()
+            .map(|v| json!(v))
+            .map_err(|e| e.to_string()),
+        "watchdog_timeout" => device
+            .get_watchdog_timeout()
+            .map(|v| json!(v as f64 / 1000.0))
+            .map_err(|e| e.to_string()),
+        "watchdog_enabled" => device
+            .get_watchdog_timeout()
+            .map(|v| json!(v > 0))
+            .map_err(|e| e.to_string()),
         "V_in" | "V_cap" | "I_in" | "T_mcu" | "T_pcb" | "state" | "watchdog_elapsed" => {
             match device.get_measurements() {
                 Ok(m) => Ok(match key.as_str() {

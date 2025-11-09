@@ -265,6 +265,16 @@ impl HalpiDevice {
         })
     }
 
+    /// Get watchdog timeout in milliseconds
+    ///
+    /// Returns 0 if the watchdog is disabled, or the timeout value in milliseconds if enabled.
+    ///
+    /// # Errors
+    /// Returns `I2cError` if the timeout cannot be read.
+    pub fn get_watchdog_timeout(&mut self) -> Result<u16, I2cError> {
+        self.read_word(protocol::REG_WATCHDOG_TIMEOUT)
+    }
+
     /// Set watchdog timeout in milliseconds
     ///
     /// Set to 0 to disable the watchdog. Writing a non-zero value enables the watchdog
