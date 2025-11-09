@@ -115,6 +115,16 @@ function test:coverage {
 ################################################################################
 # Docker-based Build Commands (for macOS/non-Linux development)
 
+# Helper function to detect host architecture and return platform + cache suffix
+_detect_docker_platform() {
+  local arch=$(uname -m)
+  case "$arch" in
+    arm64|aarch64) echo "linux/arm64:arm64" ;;
+    x86_64|amd64) echo "linux/amd64:amd64" ;;
+    *) echo "linux/amd64:amd64" ;;  # Default to amd64 if unknown
+  esac
+}
+
 function build:docker {
   #@ Build in Docker container (automatic Linux environment)
   #@ Category: Docker Build
@@ -123,13 +133,7 @@ function build:docker {
   echo "🏗️  Building in Docker container..."
 
   # Detect host architecture for platform selection
-  local arch=$(uname -m)
-  local platform=""
-  case "$arch" in
-    arm64|aarch64) platform="linux/arm64" ;;
-    x86_64|amd64) platform="linux/amd64" ;;
-    *) platform="linux/amd64" ;;  # Default to amd64 if unknown
-  esac
+  IFS=':' read -r platform cache_suffix <<< "$(_detect_docker_platform)"
 
   docker run --rm \
     --platform "$platform" \
@@ -138,8 +142,6 @@ function build:docker {
     mcr.microsoft.com/devcontainers/rust:1-bookworm \
     bash -c "
       set -e
-      echo '📦 Installing ARM64 target...'
-      rustup target add aarch64-unknown-linux-musl
       echo '🔨 Running cargo build $build_args...'
       cargo build $build_args
       echo '✅ Build complete!'
@@ -161,28 +163,15 @@ function build:docker:cross {
   echo "🏗️  Cross-compiling for ARM64 in Docker container..."
 
   # Detect host architecture for platform selection
-  local arch=$(uname -m)
-  local platform=""
-  local cache_suffix=""
-  case "$arch" in
-    arm64|aarch64)
-      platform="linux/arm64"
-      cache_suffix="arm64"
-      ;;
-    x86_64|amd64)
-      platform="linux/amd64"
-      cache_suffix="amd64"
-      ;;
-    *)
-      platform="linux/amd64"
-      cache_suffix="amd64"
-      ;;
-  esac
+  IFS=':' read -r platform cache_suffix <<< "$(_detect_docker_platform)"
 
   # Create architecture-specific Docker volume for cargo cache
   local cache_volume="halpi2-cargo-cache-${cache_suffix}"
   docker volume create "$cache_volume" > /dev/null 2>&1 || true
 
+  # SECURITY WARNING: Mounting /var/run/docker.sock grants full Docker daemon access,
+  # effectively giving root access to the host. Required for cross tool to work with Docker.
+  # See: https://docs.docker.com/engine/security/protect-access/
   docker run --rm \
     --platform "$platform" \
     -v "$(pwd):/workspace" \
@@ -206,8 +195,13 @@ function build:docker:cross {
       else
         echo '   Installing cross (this will be cached)...'
         cargo install cross --locked 2>&1 | grep -E '(Installing|Installed)' || true
+        # Verify cross binary exists after installation
+        if [ ! -f /usr/local/cargo/bin/cross ]; then
+          echo '❌ Error: cross binary not found after installation!' >&2
+          exit 1
+        fi
         mkdir -p /cargo-cache/bin
-        cp /usr/local/cargo/bin/cross /cargo-cache/bin/ 2>/dev/null || true
+        cp /usr/local/cargo/bin/cross /cargo-cache/bin/
       fi
 
       echo '🔨 Running cross build for ARM64...'
@@ -231,23 +225,7 @@ function package:deb:docker {
   echo "🏗️  Building Debian package for ARM64 in Docker container..."
 
   # Detect host architecture for platform selection
-  local arch=$(uname -m)
-  local platform=""
-  local cache_suffix=""
-  case "$arch" in
-    arm64|aarch64)
-      platform="linux/arm64"
-      cache_suffix="arm64"
-      ;;
-    x86_64|amd64)
-      platform="linux/amd64"
-      cache_suffix="amd64"
-      ;;
-    *)
-      platform="linux/amd64"
-      cache_suffix="amd64"
-      ;;
-  esac
+  IFS=':' read -r platform cache_suffix <<< "$(_detect_docker_platform)"
 
   # Create architecture-specific Docker volume for cargo cache
   local cache_volume="halpi2-cargo-cache-${cache_suffix}"
@@ -275,8 +253,13 @@ function package:deb:docker {
       else
         echo '   Installing cargo-deb (this will be cached)...'
         cargo install cargo-deb --locked 2>&1 | grep -E '(Installing|Installed)' || true
+        # Verify cargo-deb binary exists after installation
+        if [ ! -f /usr/local/cargo/bin/cargo-deb ]; then
+          echo '❌ Error: cargo-deb binary not found after installation!' >&2
+          exit 1
+        fi
         mkdir -p /cargo-cache/bin
-        cp /usr/local/cargo/bin/cargo-deb /cargo-cache/bin/ 2>/dev/null || true
+        cp /usr/local/cargo/bin/cargo-deb /cargo-cache/bin/
       fi
 
       echo '🔨 Building release binary for ARM64...'
