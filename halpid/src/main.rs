@@ -5,23 +5,15 @@ pub mod state_machine;
 
 use clap::Parser;
 use std::path::PathBuf;
-#[cfg(target_os = "linux")]
 use std::sync::Arc;
-#[cfg(target_os = "linux")]
 use tokio::sync::{Mutex, RwLock};
-#[cfg(target_os = "linux")]
 use tracing::{error, info};
-#[cfg(target_os = "linux")]
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-#[cfg(target_os = "linux")]
 use halpi_common::config::Config;
 
-#[cfg(target_os = "linux")]
 use i2c::HalpiDevice;
-#[cfg(target_os = "linux")]
 use server::app::AppState;
-#[cfg(target_os = "linux")]
 use state_machine::StateMachine;
 
 /// HALPI2 power monitor and watchdog daemon
@@ -59,7 +51,6 @@ struct Cli {
     poweroff: Option<String>,
 }
 
-#[cfg(target_os = "linux")]
 #[tokio::main]
 async fn main() {
     // Initialize tracing
@@ -182,12 +173,6 @@ async fn main() {
     daemon::signals::cleanup(device, &socket_path).await;
 
     info!("Daemon shutdown complete");
-}
-
-#[cfg(not(target_os = "linux"))]
-fn main() {
-    eprintln!("halpid requires Linux for I2C device access");
-    std::process::exit(1);
 }
 
 #[cfg(test)]

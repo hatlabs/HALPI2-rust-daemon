@@ -72,7 +72,6 @@ pub async fn put_config(
 }
 
 #[cfg(test)]
-#[cfg(target_os = "linux")]
 mod tests {
     use super::*;
     use crate::i2c::device::HalpiDevice;

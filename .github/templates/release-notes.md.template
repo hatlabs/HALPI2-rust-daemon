@@ -1,0 +1,66 @@
+## What's New
+
+_Edit this section to highlight the most important changes in this release._
+
+{{FEATURES}}
+{{FIXES}}
+{{IMPROVEMENTS}}
+{{DOCS}}
+{{TESTS}}
+## 📦 Installation & Upgrade
+
+### From APT Repository (Recommended)
+
+**First time setup**: Add the HAT Labs repository by following the instructions at [apt.hatlabs.fi](https://apt.hatlabs.fi)
+
+**Install or upgrade**:
+
+```bash
+sudo apt update
+sudo apt install halpid  # or: sudo apt upgrade halpid
+```
+
+### Manual Installation
+
+Download the Debian package and install:
+
+```bash
+# Download halpid_{{VERSION}}_arm64.deb from release assets
+
+# Install
+sudo dpkg -i halpid_{{VERSION}}_arm64.deb
+
+# Service starts automatically
+sudo systemctl status halpid
+```
+
+### Testing the Release
+
+1. **Check daemon status**: `sudo systemctl status halpid`
+2. **Test CLI**: `halpi status`, `halpi version`, `halpi config`
+3. **Verify I2C communication** (if hardware available): Check analog measurements
+4. **Test USB control**: `halpi usb`
+5. **Monitor logs**: `sudo journalctl -u halpid -f`
+
+## 🔄 Migration from Python halpid 4.x
+
+This version is **100% API compatible** with Python halpid 4.x. Migration is seamless:
+
+1. Stop Python daemon: `sudo systemctl stop halpid`
+2. Install Rust version: `sudo apt install halpid`
+3. Service starts automatically with existing configuration
+4. Test: `halpi status`
+
+**Performance improvements**:
+- Memory: ~50 MB → <10 MB (5x reduction)
+- Startup: ~2s → <100ms (20x faster)
+- Single static binary with zero runtime dependencies
+
+See [docs/MIGRATION.md](https://github.com/hatlabs/HALPI2-rust-daemon/blob/main/docs/MIGRATION.md) for detailed migration guide.
+
+## 📋 Release Artifacts
+
+- **halpid_{{VERSION}}_arm64.deb** - Debian package (includes `halpid` daemon and `halpi` CLI)
+- **build-info.txt** - Build metadata and installation instructions
+
+{{CHANGELOG_LINK}}
