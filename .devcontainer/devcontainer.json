@@ -1,0 +1,27 @@
+{
+  "name": "HALPI2 Rust Daemon",
+  "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
+
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "vadimcn.vscode-lldb",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "rust-analyzer.checkOnSave.command": "clippy"
+      }
+    }
+  },
+
+  "postCreateCommand": "rustup target add aarch64-unknown-linux-musl && cargo install cross cargo-deb --locked",
+
+  "forwardPorts": [],
+
+  "remoteUser": "vscode"
+}

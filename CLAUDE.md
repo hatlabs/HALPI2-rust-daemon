@@ -6,6 +6,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 HALPI2 Rust Daemon is a reimplementation of the HALPI2 power monitor and watchdog daemon in Rust for improved performance, reliability, and resource utilization. It maintains 100% API compatibility with the Python `halpid` version 4.x.
 
+## Development Environment
+
+**IMPORTANT**: This is a Linux-only daemon. Use one of these approaches for development:
+
+### Option 1: Dev Container (Recommended for macOS)
+Open the project in VSCode and select "Reopen in Container". This provides:
+- Full Linux environment for native builds and testing
+- Pre-configured Rust toolchain with ARM64 cross-compilation support
+- All tools pre-installed (`cross`, `cargo-deb`, `gh`)
+
+### Option 2: Cross-Compilation (Limited)
+Cross-compilation from macOS works for building but NOT for testing:
+```bash
+./run build:cross --release  # Compiles for ARM64 Linux
+```
+Note: Tests cannot run via cross-compilation - use dev container instead.
+
+### Option 3: Native Linux
+If running on Linux, all commands work natively without containers.
+
 ## Development Commands
 
 Use the `./run` script for all development tasks:
