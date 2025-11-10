@@ -66,10 +66,10 @@ fn parse_value(value_str: &str) -> Result<Value> {
     }
 
     // Try parsing as float (only reached for values with decimal points like "42.5")
-    if let Ok(f) = value_str.parse::<f64>() {
-        if let Some(n) = serde_json::Number::from_f64(f) {
-            return Ok(Value::Number(n));
-        }
+    if let Ok(f) = value_str.parse::<f64>()
+        && let Some(n) = serde_json::Number::from_f64(f)
+    {
+        return Ok(Value::Number(n));
     }
 
     // Default to string
