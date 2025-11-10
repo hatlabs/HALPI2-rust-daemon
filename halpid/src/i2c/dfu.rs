@@ -170,6 +170,14 @@ impl HalpiDevice {
                     tracing::trace!("DFU queue full, waiting...");
                     thread::sleep(Duration::from_millis(100));
                 }
+                DFUState::Idle => {
+                    // IDLE state means DFU was not started or was aborted
+                    tracing::error!("DFU in IDLE state during upload");
+                    return Err(I2cError::DfuUnexpectedState {
+                        expected: DFUState::Updating,
+                        actual: status,
+                    });
+                }
                 DFUState::CrcError
                 | DFUState::DataLengthError
                 | DFUState::WriteError
@@ -179,9 +187,9 @@ impl HalpiDevice {
                     return Err(I2cError::DfuError { state: status });
                 }
                 _ => {
-                    // Unexpected state
+                    // Unexpected state - use 50ms default polling delay
                     tracing::trace!("DFU unexpected state: {:?}, waiting...", status);
-                    thread::sleep(Duration::from_millis(100));
+                    thread::sleep(Duration::from_millis(50));
                 }
             }
         }
@@ -264,7 +272,7 @@ impl HalpiDevice {
         // Final verification loop (matches Python lines 483-511)
         // Wait until blocks_written == total_blocks AND status == ReadyToCommit
         let verify_start = std::time::Instant::now();
-        let verify_timeout = Duration::from_secs(30);
+        let verify_timeout = Duration::from_secs(5);
 
         loop {
             if verify_start.elapsed() > verify_timeout {
@@ -294,6 +302,9 @@ impl HalpiDevice {
             if status == DFUState::ReadyToCommit && blocks_written == total_blocks as u16 {
                 break;
             }
+
+            // 500ms delay between verification loop iterations (matches Python implementation)
+            thread::sleep(Duration::from_millis(500));
         }
 
         // Pre-commit delay (matches Python line 516)
