@@ -53,7 +53,6 @@ assets = [
     ["target/release/halpid", "usr/bin/", "755"],
     ["target/release/halpi", "usr/bin/", "755"],
     ["../config/halpid.conf", "etc/halpid/halpid.conf", "644"],
-    ["../systemd/halpid.service", "lib/systemd/system/", "644"],
 ]
 conf-files = [
     "/etc/halpid/halpid.conf",
