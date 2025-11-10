@@ -4,7 +4,6 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use halpi_common::protocol::kelvin_to_celsius;
 use serde_json::Value;
 use serde_json::json;
 
@@ -40,6 +39,11 @@ pub async fn get_all_values(State(state): State<AppState>) -> Response {
         .get_device_id()
         .unwrap_or_else(|_| "0000000000000000".to_string());
 
+    // Read additional state values
+    let raspi_power_state = device.get_5v_output_enabled().unwrap_or(false);
+    let watchdog_timeout = device.get_watchdog_timeout().unwrap_or(0);
+    let watchdog_enabled = watchdog_timeout > 0;
+
     // Release lock
     drop(device);
 
@@ -52,9 +56,12 @@ pub async fn get_all_values(State(state): State<AppState>) -> Response {
         "V_in": measurements.dcin_voltage,
         "V_cap": measurements.supercap_voltage,
         "I_in": measurements.input_current,
-        "T_mcu": kelvin_to_celsius(measurements.mcu_temperature),
-        "T_pcb": kelvin_to_celsius(measurements.pcb_temperature),
+        "T_mcu": measurements.mcu_temperature,
+        "T_pcb": measurements.pcb_temperature,
         "state": measurements.power_state.name(),
+        "5v_output_enabled": raspi_power_state,
+        "watchdog_enabled": watchdog_enabled,
+        "watchdog_timeout": watchdog_timeout as f64 / 1000.0, // Convert ms to seconds
         "watchdog_elapsed": measurements.watchdog_elapsed,
     });
 
@@ -74,6 +81,9 @@ fn requires_device_access(key: &str) -> bool {
             | "T_mcu"
             | "T_pcb"
             | "state"
+            | "5v_output_enabled"
+            | "watchdog_enabled"
+            | "watchdog_timeout"
             | "watchdog_elapsed"
     )
 }
@@ -119,14 +129,26 @@ pub async fn get_value(State(state): State<AppState>, Path(key): Path<String>) -
             .get_device_id()
             .map(|id| json!(id))
             .or_else(|_| Ok(json!("0000000000000000"))),
+        "5v_output_enabled" => device
+            .get_5v_output_enabled()
+            .map(|v| json!(v))
+            .map_err(|e| e.to_string()),
+        "watchdog_timeout" => device
+            .get_watchdog_timeout()
+            .map(|v| json!(v as f64 / 1000.0))
+            .map_err(|e| e.to_string()),
+        "watchdog_enabled" => device
+            .get_watchdog_timeout()
+            .map(|v| json!(v > 0))
+            .map_err(|e| e.to_string()),
         "V_in" | "V_cap" | "I_in" | "T_mcu" | "T_pcb" | "state" | "watchdog_elapsed" => {
             match device.get_measurements() {
                 Ok(m) => Ok(match key.as_str() {
                     "V_in" => json!(m.dcin_voltage),
                     "V_cap" => json!(m.supercap_voltage),
                     "I_in" => json!(m.input_current),
-                    "T_mcu" => json!(kelvin_to_celsius(m.mcu_temperature)),
-                    "T_pcb" => json!(kelvin_to_celsius(m.pcb_temperature)),
+                    "T_mcu" => json!(m.mcu_temperature),
+                    "T_pcb" => json!(m.pcb_temperature),
                     "state" => json!(m.power_state.name()),
                     "watchdog_elapsed" => json!(m.watchdog_elapsed),
                     _ => unreachable!(),

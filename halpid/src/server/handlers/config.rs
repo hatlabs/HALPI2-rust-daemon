@@ -1,4 +1,7 @@
 //! Configuration endpoint handlers
+//!
+//! These endpoints read/write controller configuration from I2C registers,
+//! NOT the daemon's configuration file.
 
 use axum::Json;
 use axum::extract::{Path, State};
@@ -8,42 +11,53 @@ use serde_json::json;
 
 use crate::server::app::AppState;
 
-/// GET /config - Get all configuration values
+/// GET /config - Get all configuration values from controller
 pub async fn get_all_config(State(state): State<AppState>) -> Response {
-    let config = state.config.read().await;
+    let mut device = state.device.lock().await;
+
+    // Read all configuration values from controller registers
+    let watchdog_timeout = device.get_watchdog_timeout().unwrap_or(0);
+    let power_on_threshold = device.get_power_on_threshold().unwrap_or(0.0);
+    let solo_power_off_threshold = device.get_solo_power_off_threshold().unwrap_or(0.0);
+    let led_brightness = device.get_led_brightness().unwrap_or(0);
+    let auto_restart = device.get_auto_restart().unwrap_or(false);
+    let solo_depleting_timeout = device.get_solo_depleting_timeout().unwrap_or(0);
+
+    drop(device);
 
     let config_json = json!({
-        "i2c_bus": config.i2c_bus,
-        "i2c_addr": format!("0x{:02X}", config.i2c_addr),
-        "blackout_time_limit": config.blackout_time_limit,
-        "blackout_voltage_limit": config.blackout_voltage_limit,
-        "socket": config.socket.as_ref().map(|p| p.to_string_lossy().to_string()),
-        "socket_group": config.socket_group,
-        "poweroff": config.poweroff,
+        "watchdog_timeout": watchdog_timeout as f64 / 1000.0, // Convert ms to seconds
+        "power_on_threshold": power_on_threshold,
+        "solo_power_off_threshold": solo_power_off_threshold,
+        "led_brightness": led_brightness,
+        "auto_restart": auto_restart,
+        "solo_depleting_timeout": solo_depleting_timeout as f64 / 1000.0, // Convert ms to seconds
     });
 
     (StatusCode::OK, Json(config_json)).into_response()
 }
 
-/// GET /config/:key - Get a specific configuration value
+/// GET /config/:key - Get a specific configuration value from controller
 pub async fn get_config(State(state): State<AppState>, Path(key): Path<String>) -> Response {
-    let config = state.config.read().await;
+    let mut device = state.device.lock().await;
 
     let value = match key.as_str() {
-        "i2c_bus" => Some(json!(config.i2c_bus)),
-        "i2c_addr" => Some(json!(format!("0x{:02X}", config.i2c_addr))),
-        "blackout_time_limit" => Some(json!(config.blackout_time_limit)),
-        "blackout_voltage_limit" => Some(json!(config.blackout_voltage_limit)),
-        "socket" => Some(json!(
-            config
-                .socket
-                .as_ref()
-                .map(|p| p.to_string_lossy().to_string())
-        )),
-        "socket_group" => Some(json!(config.socket_group)),
-        "poweroff" => Some(json!(config.poweroff)),
+        "watchdog_timeout" => device
+            .get_watchdog_timeout()
+            .map(|v| json!(v as f64 / 1000.0))
+            .ok(),
+        "power_on_threshold" => device.get_power_on_threshold().map(|v| json!(v)).ok(),
+        "solo_power_off_threshold" => device.get_solo_power_off_threshold().map(|v| json!(v)).ok(),
+        "led_brightness" => device.get_led_brightness().map(|v| json!(v)).ok(),
+        "auto_restart" => device.get_auto_restart().map(|v| json!(v)).ok(),
+        "solo_depleting_timeout" => device
+            .get_solo_depleting_timeout()
+            .map(|v| json!(v as f64 / 1000.0))
+            .ok(),
         _ => None,
     };
+
+    drop(device);
 
     match value {
         Some(v) => (StatusCode::OK, Json(v)).into_response(),
@@ -55,20 +69,78 @@ pub async fn get_config(State(state): State<AppState>, Path(key): Path<String>) 
     }
 }
 
-/// PUT /config/:key - Update a specific configuration value
-///
-/// Note: Daemon configuration is read from file and not modified at runtime.
-/// This endpoint returns METHOD_NOT_ALLOWED for API compatibility.
+/// PUT /config/:key - Update a specific configuration value on controller
 pub async fn put_config(
-    State(_state): State<AppState>,
-    Path(_key): Path<String>,
-    Json(_payload): Json<serde_json::Value>,
+    State(state): State<AppState>,
+    Path(key): Path<String>,
+    Json(payload): Json<serde_json::Value>,
 ) -> Response {
-    (
-        StatusCode::METHOD_NOT_ALLOWED,
-        Json(json!({"error": "Configuration is read-only, modify /etc/halpid/halpid.conf and restart daemon"})),
-    )
-        .into_response()
+    let mut device = state.device.lock().await;
+
+    let result = match key.as_str() {
+        "watchdog_timeout" => {
+            if let Some(value) = payload.as_f64() {
+                let timeout_ms = (value * 1000.0) as u16;
+                device
+                    .set_watchdog_timeout(timeout_ms)
+                    .map_err(|e| e.to_string())
+            } else {
+                Err("Invalid value type".to_string())
+            }
+        }
+        "power_on_threshold" => {
+            if let Some(value) = payload.as_f64() {
+                device
+                    .set_power_on_threshold(value as f32)
+                    .map_err(|e| e.to_string())
+            } else {
+                Err("Invalid value type".to_string())
+            }
+        }
+        "solo_power_off_threshold" => {
+            if let Some(value) = payload.as_f64() {
+                device
+                    .set_solo_power_off_threshold(value as f32)
+                    .map_err(|e| e.to_string())
+            } else {
+                Err("Invalid value type".to_string())
+            }
+        }
+        "led_brightness" => {
+            if let Some(value) = payload.as_u64() {
+                device
+                    .set_led_brightness(value as u8)
+                    .map_err(|e| e.to_string())
+            } else {
+                Err("Invalid value type".to_string())
+            }
+        }
+        "auto_restart" => {
+            if let Some(value) = payload.as_bool() {
+                device.set_auto_restart(value).map_err(|e| e.to_string())
+            } else {
+                Err("Invalid value type".to_string())
+            }
+        }
+        "solo_depleting_timeout" => {
+            if let Some(value) = payload.as_f64() {
+                let timeout_ms = (value * 1000.0) as u32;
+                device
+                    .set_solo_depleting_timeout(timeout_ms)
+                    .map_err(|e| e.to_string())
+            } else {
+                Err("Invalid value type".to_string())
+            }
+        }
+        _ => Err(format!("Unknown config key: {}", key)),
+    };
+
+    drop(device);
+
+    match result {
+        Ok(_) => (StatusCode::OK, Json(json!({"status": "ok"}))).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e}))).into_response(),
+    }
 }
 
 #[cfg(test)]

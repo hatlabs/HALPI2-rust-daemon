@@ -265,6 +265,16 @@ impl HalpiDevice {
         })
     }
 
+    /// Get watchdog timeout in milliseconds
+    ///
+    /// Returns 0 if the watchdog is disabled, or the timeout value in milliseconds if enabled.
+    ///
+    /// # Errors
+    /// Returns `I2cError` if the timeout cannot be read.
+    pub fn get_watchdog_timeout(&mut self) -> Result<u16, I2cError> {
+        self.read_word(protocol::REG_WATCHDOG_TIMEOUT)
+    }
+
     /// Set watchdog timeout in milliseconds
     ///
     /// Set to 0 to disable the watchdog. Writing a non-zero value enables the watchdog
@@ -290,12 +300,28 @@ impl HalpiDevice {
         self.set_watchdog_timeout(timeout_ms)
     }
 
+    /// Get power-on voltage threshold (in volts)
+    ///
+    /// # Errors
+    /// Returns `I2cError` if the threshold cannot be read.
+    pub fn get_power_on_threshold(&mut self) -> Result<f32, I2cError> {
+        self.read_analog_word(protocol::REG_POWER_ON_THRESHOLD, protocol::VCAP_MAX)
+    }
+
     /// Set power-on voltage threshold (in volts)
     ///
     /// # Errors
     /// Returns `I2cError` if the threshold cannot be written.
     pub fn set_power_on_threshold(&mut self, volts: f32) -> Result<(), I2cError> {
         self.write_analog_word(protocol::REG_POWER_ON_THRESHOLD, volts, protocol::VCAP_MAX)
+    }
+
+    /// Get solo mode power-off voltage threshold (in volts)
+    ///
+    /// # Errors
+    /// Returns `I2cError` if the threshold cannot be read.
+    pub fn get_solo_power_off_threshold(&mut self) -> Result<f32, I2cError> {
+        self.read_analog_word(protocol::REG_SOLO_POWEROFF_THRESHOLD, protocol::VCAP_MAX)
     }
 
     /// Set solo mode power-off voltage threshold (in volts)
@@ -332,6 +358,16 @@ impl HalpiDevice {
         Ok(self.read_byte(protocol::REG_RASPI_POWER_STATE)? != 0)
     }
 
+    /// Get LED brightness (0-255)
+    ///
+    /// **Note**: This feature requires firmware version 2.x or later.
+    ///
+    /// # Errors
+    /// Returns `I2cError` if the brightness cannot be read.
+    pub fn get_led_brightness(&mut self) -> Result<u8, I2cError> {
+        self.read_byte(protocol::REG_LED_BRIGHTNESS)
+    }
+
     /// Set LED brightness (0-255)
     ///
     /// **Note**: This feature requires firmware version 2.x or later.
@@ -343,6 +379,14 @@ impl HalpiDevice {
         self.write_byte(protocol::REG_LED_BRIGHTNESS, brightness)
     }
 
+    /// Get auto-restart setting
+    ///
+    /// # Errors
+    /// Returns `I2cError` if the setting cannot be read.
+    pub fn get_auto_restart(&mut self) -> Result<bool, I2cError> {
+        Ok(self.read_byte(protocol::REG_AUTO_RESTART)? != 0)
+    }
+
     /// Set auto-restart enable state
     ///
     /// When enabled, the system will automatically restart after a shutdown.
@@ -351,6 +395,15 @@ impl HalpiDevice {
     /// Returns `I2cError` if the state cannot be written.
     pub fn set_auto_restart(&mut self, enabled: bool) -> Result<(), I2cError> {
         self.write_byte(protocol::REG_AUTO_RESTART, if enabled { 1 } else { 0 })
+    }
+
+    /// Get solo depleting timeout in milliseconds
+    ///
+    /// # Errors
+    /// Returns `I2cError` if the timeout cannot be read.
+    pub fn get_solo_depleting_timeout(&mut self) -> Result<u32, I2cError> {
+        let bytes = self.read_bytes(protocol::REG_SOLO_DEPLETING_TIMEOUT, 4)?;
+        Ok(protocol::decode_u32(&bytes))
     }
 
     /// Set solo depleting timeout in milliseconds
