@@ -59,12 +59,13 @@ fn parse_value(value_str: &str) -> Result<Value> {
         return Ok(Value::Bool(false));
     }
 
-    // Try parsing as integer
+    // Try parsing as integer first (e.g., "42", "1000")
+    // This ensures values without decimal points are stored as integers for JSON compatibility
     if let Ok(i) = value_str.parse::<i64>() {
         return Ok(Value::Number(i.into()));
     }
 
-    // Try parsing as float
+    // Try parsing as float (only reached for values with decimal points like "42.5")
     if let Ok(f) = value_str.parse::<f64>() {
         if let Some(n) = serde_json::Number::from_f64(f) {
             return Ok(Value::Number(n));
