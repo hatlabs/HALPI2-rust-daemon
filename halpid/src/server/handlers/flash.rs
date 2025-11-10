@@ -10,9 +10,6 @@ use crate::server::app::AppState;
 
 /// POST /flash - Upload firmware to device
 pub async fn post_flash(State(state): State<AppState>, mut multipart: Multipart) -> Response {
-    // Block size for firmware upload (4KB)
-    const FLASH_BLOCK_SIZE: usize = 4096;
-
     // Extract firmware file from multipart form data
     let firmware_data = match extract_firmware(&mut multipart).await {
         Ok(data) => data,
@@ -36,43 +33,14 @@ pub async fn post_flash(State(state): State<AppState>, mut multipart: Multipart)
     // Acquire device lock for the entire upload process
     let mut device = state.device.lock().await;
 
-    // Start DFU process
-    if let Err(e) = device.start_dfu(firmware_data.len() as u32) {
+    // Upload firmware using high-level method with progress tracking
+    if let Err(e) = device.upload_firmware(&firmware_data, |_written, _total| {
+        // Progress callback - silent for now
+        // Could add tracing::debug!() here for verbose logging
+    }) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("Failed to start DFU: {}", e)})),
-        )
-            .into_response();
-    }
-
-    // Upload firmware in 4KB blocks
-    let num_blocks = firmware_data.len().div_ceil(FLASH_BLOCK_SIZE);
-
-    for block_num in 0..num_blocks {
-        let start = block_num * FLASH_BLOCK_SIZE;
-        let end = std::cmp::min(start + FLASH_BLOCK_SIZE, firmware_data.len());
-        let block_data = &firmware_data[start..end];
-
-        // Upload block with retries
-        if let Err(e) = device.upload_block(block_num as u16, block_data) {
-            // Abort DFU on error
-            let _ = device.abort_dfu();
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({
-                    "error": format!("Failed to upload block {}: {}", block_num, e)
-                })),
-            )
-                .into_response();
-        }
-    }
-
-    // Commit DFU
-    if let Err(e) = device.commit_dfu() {
-        let _ = device.abort_dfu();
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": format!("Failed to commit DFU: {}", e)})),
+            Json(json!({"error": format!("Failed to upload firmware: {}", e)})),
         )
             .into_response();
     }

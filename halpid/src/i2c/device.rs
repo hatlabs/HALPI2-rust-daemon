@@ -578,6 +578,10 @@ pub enum I2cError {
     /// DFU queue full timeout (too many retries)
     #[error("DFU queue full timeout: firmware controller is not accepting blocks")]
     DfuQueueFullTimeout,
+
+    /// DFU operation timeout
+    #[error("DFU operation timeout: device did not become ready within the specified time")]
+    DfuTimeout,
 }
 
 // Note: Unit tests are omitted because constructing LinuxI2CError instances
