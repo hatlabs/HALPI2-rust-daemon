@@ -260,10 +260,16 @@ impl HalpiDevice {
             thread::sleep(Duration::from_millis(100));
 
             // Wait for device ready before upload (matches Python wait_for_dfu_ready())
-            self.wait_for_dfu_ready(DFU_READY_TIMEOUT)?;
+            if let Err(e) = self.wait_for_dfu_ready(DFU_READY_TIMEOUT) {
+                let _ = self.abort_dfu();
+                return Err(e);
+            }
 
             // Upload block (check status BEFORE upload, not after)
-            self.upload_block(block_num as u16, chunk)?;
+            if let Err(e) = self.upload_block(block_num as u16, chunk) {
+                let _ = self.abort_dfu();
+                return Err(e);
+            }
 
             // Report progress
             progress(block_num + 1, total_blocks);
@@ -281,10 +287,22 @@ impl HalpiDevice {
             }
 
             thread::sleep(Duration::from_millis(100));
-            let status = self.get_dfu_status()?;
+            let status = match self.get_dfu_status() {
+                Ok(s) => s,
+                Err(e) => {
+                    let _ = self.abort_dfu();
+                    return Err(e);
+                }
+            };
 
             thread::sleep(Duration::from_millis(100));
-            let blocks_written = self.get_blocks_written()?;
+            let blocks_written = match self.get_blocks_written() {
+                Ok(b) => b,
+                Err(e) => {
+                    let _ = self.abort_dfu();
+                    return Err(e);
+                }
+            };
 
             // Check success condition FIRST (matches Python implementation)
             if status == DFUState::ReadyToCommit && blocks_written == total_blocks as u16 {
@@ -294,7 +312,8 @@ impl HalpiDevice {
             // THEN check for error states (only if continuing loop)
             if matches!(
                 status,
-                DFUState::CrcError
+                DFUState::Idle
+                    | DFUState::CrcError
                     | DFUState::DataLengthError
                     | DFUState::WriteError
                     | DFUState::ProtocolError
