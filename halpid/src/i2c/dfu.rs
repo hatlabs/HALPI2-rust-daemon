@@ -288,7 +288,15 @@ impl HalpiDevice {
             thread::sleep(Duration::from_millis(100));
             let status = self.get_dfu_status()?;
 
-            // Check for error states
+            thread::sleep(Duration::from_millis(100));
+            let blocks_written = self.get_blocks_written()?;
+
+            // Check success condition FIRST (matches Python implementation)
+            if status == DFUState::ReadyToCommit && blocks_written == total_blocks as u16 {
+                break;
+            }
+
+            // THEN check for error states (only if continuing loop)
             if matches!(
                 status,
                 DFUState::CrcError
@@ -300,15 +308,7 @@ impl HalpiDevice {
                 return Err(I2cError::DfuError { state: status });
             }
 
-            thread::sleep(Duration::from_millis(100));
-            let blocks_written = self.get_blocks_written()?;
-
-            // Check if all blocks are written and ready to commit
-            if status == DFUState::ReadyToCommit && blocks_written == total_blocks as u16 {
-                break;
-            }
-
-            // 500ms delay between verification loop iterations (matches Python implementation)
+            // 500ms delay before next iteration (matches Python implementation)
             thread::sleep(Duration::from_millis(500));
         }
 
