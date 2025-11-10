@@ -246,8 +246,13 @@ impl HalpiDevice {
                 | DFUState::WriteError
                 | DFUState::ProtocolError
         ) {
-            tracing::error!("DFU entered error state immediately after start: {:?}", status_after_start);
-            return Err(I2cError::DfuError { state: status_after_start });
+            tracing::error!(
+                "DFU entered error state immediately after start: {:?}",
+                status_after_start
+            );
+            return Err(I2cError::DfuError {
+                state: status_after_start,
+            });
         }
 
         // Calculate total blocks
