@@ -4,7 +4,6 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use halpi_common::protocol::kelvin_to_celsius;
 use serde_json::Value;
 use serde_json::json;
 
@@ -52,8 +51,8 @@ pub async fn get_all_values(State(state): State<AppState>) -> Response {
         "V_in": measurements.dcin_voltage,
         "V_cap": measurements.supercap_voltage,
         "I_in": measurements.input_current,
-        "T_mcu": kelvin_to_celsius(measurements.mcu_temperature),
-        "T_pcb": kelvin_to_celsius(measurements.pcb_temperature),
+        "T_mcu": measurements.mcu_temperature,
+        "T_pcb": measurements.pcb_temperature,
         "state": measurements.power_state.name(),
         "watchdog_elapsed": measurements.watchdog_elapsed,
     });
@@ -125,8 +124,8 @@ pub async fn get_value(State(state): State<AppState>, Path(key): Path<String>) -
                     "V_in" => json!(m.dcin_voltage),
                     "V_cap" => json!(m.supercap_voltage),
                     "I_in" => json!(m.input_current),
-                    "T_mcu" => json!(kelvin_to_celsius(m.mcu_temperature)),
-                    "T_pcb" => json!(kelvin_to_celsius(m.pcb_temperature)),
+                    "T_mcu" => json!(m.mcu_temperature),
+                    "T_pcb" => json!(m.pcb_temperature),
                     "state" => json!(m.power_state.name()),
                     "watchdog_elapsed" => json!(m.watchdog_elapsed),
                     _ => unreachable!(),
