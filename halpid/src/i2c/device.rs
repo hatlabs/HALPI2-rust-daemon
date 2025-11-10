@@ -11,8 +11,8 @@
 
 use halpi_common::protocol::{self, ProtocolError};
 use halpi_common::types::{Measurements, PowerState, Version};
-use i2cdev::core::I2CDevice;
-use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
+use i2cdev::core::{I2CDevice, I2CMessage, I2CTransfer};
+use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError, LinuxI2CMessage};
 use std::thread;
 use std::time::Duration;
 
@@ -74,26 +74,46 @@ impl HalpiDevice {
     /// Read a single byte from a register
     ///
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
+    /// Uses raw I2C with repeated START to match Python smbus2 i2c_rdwr() behavior.
     pub(super) fn read_byte(&mut self, reg: u8) -> Result<u8, I2cError> {
-        self.retry_operation(|device| {
+        let addr = self.addr as u16;
+        self.retry_operation(move |device| {
+            let write_data = [reg];
+            let mut read_buffer = [0u8; 1];
+
+            let mut messages = [
+                LinuxI2CMessage::write(&write_data).with_address(addr),
+                LinuxI2CMessage::read(&mut read_buffer).with_address(addr),
+            ];
+
             device
-                .smbus_read_byte_data(reg)
-                .map_err(|e| I2cError::Read { reg, source: e })
+                .transfer(&mut messages)
+                .map_err(|e| I2cError::Read { reg, source: e })?;
+
+            Ok(read_buffer[0])
         })
     }
 
     /// Read multiple bytes from a register
     ///
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
+    /// Uses raw I2C with repeated START to match Python smbus2 i2c_rdwr() behavior.
     fn read_bytes(&mut self, reg: u8, count: usize) -> Result<Vec<u8>, I2cError> {
-        self.retry_operation(|device| {
-            // Use SMBus block read which does a combined write-read transaction
-            // This is equivalent to Python's read_i2c_block_data()
-            let buffer = device
-                .smbus_read_i2c_block_data(reg, count as u8)
+        let addr = self.addr as u16;
+        self.retry_operation(move |device| {
+            let write_data = [reg];
+            let mut read_buffer = vec![0u8; count];
+
+            let mut messages = [
+                LinuxI2CMessage::write(&write_data).with_address(addr),
+                LinuxI2CMessage::read(&mut read_buffer).with_address(addr),
+            ];
+
+            device
+                .transfer(&mut messages)
                 .map_err(|e| I2cError::Read { reg, source: e })?;
-            tracing::debug!("Read reg 0x{:02x}: {:02x?}", reg, buffer);
-            Ok(buffer)
+
+            Ok(read_buffer)
         })
     }
 
@@ -125,38 +145,59 @@ impl HalpiDevice {
     /// Write a single byte to a register
     ///
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
+    /// Uses raw I2C via transfer() to match Python smbus2 i2c_rdwr() behavior.
     pub(super) fn write_byte(&mut self, reg: u8, value: u8) -> Result<(), I2cError> {
-        self.retry_operation(|device| {
+        let addr = self.addr as u16;
+        self.retry_operation(move |device| {
+            let data = [reg, value];
+            let mut messages = [LinuxI2CMessage::write(&data).with_address(addr)];
+
             device
-                .smbus_write_byte_data(reg, value)
-                .map_err(|e| I2cError::Write { reg, source: e })
+                .transfer(&mut messages)
+                .map_err(|e| I2cError::Write { reg, source: e })?;
+
+            Ok(())
         })
     }
 
     /// Write a 16-bit word to a register (big-endian)
     ///
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
+    /// Uses raw I2C via transfer() to match Python smbus2 i2c_rdwr() behavior.
     #[allow(dead_code)]
     fn write_word(&mut self, reg: u8, value: u16) -> Result<(), I2cError> {
+        let addr = self.addr as u16;
         let bytes = protocol::encode_word(value);
-        self.retry_operation(|device| {
+        self.retry_operation(move |device| {
+            let data = [reg, bytes[0], bytes[1]];
+            let mut messages = [LinuxI2CMessage::write(&data).with_address(addr)];
+
             device
-                .write(&[reg, bytes[0], bytes[1]])
-                .map_err(|e| I2cError::Write { reg, source: e })
+                .transfer(&mut messages)
+                .map_err(|e| I2cError::Write { reg, source: e })?;
+
+            Ok(())
         })
     }
 
     /// Write multiple bytes to a register
     ///
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
+    /// Uses raw I2C via transfer() to match Python smbus2 i2c_rdwr() behavior.
     pub(super) fn write_bytes(&mut self, reg: u8, values: &[u8]) -> Result<(), I2cError> {
-        self.retry_operation(|device| {
+        let addr = self.addr as u16;
+        self.retry_operation(move |device| {
             let mut data = Vec::with_capacity(1 + values.len());
             data.push(reg);
             data.extend_from_slice(values);
+
+            let mut messages = [LinuxI2CMessage::write(&data).with_address(addr)];
+
             device
-                .write(&data)
-                .map_err(|e| I2cError::Write { reg, source: e })
+                .transfer(&mut messages)
+                .map_err(|e| I2cError::Write { reg, source: e })?;
+
+            Ok(())
         })
     }
 

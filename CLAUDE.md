@@ -188,8 +188,15 @@ When implementing features, always verify compatibility with the Python version:
 ### I2C Communication
 - Bus: I2C bus 1
 - Address: 0x6d (HALPI2 RP2040 firmware)
-- Registers: See `halpi-common/src/i2c.rs` for register definitions
+- Registers: See `halpi-common/src/protocol.rs` for register definitions
 - Reference: `halpid/src/i2c.py` in Python implementation
+
+**CRITICAL: The firmware uses raw I2C protocol, NOT SMBus protocol.**
+- Python's `smbus2` library is used for raw I2C operations via `i2c_rdwr()`
+- In Rust, use `LinuxI2CMessage` with `transfer()` to match Python's behavior
+- All operations (reads and writes) must use `transfer()` API, not SMBus functions
+- Read operations require combined write-read transactions with repeated START
+- Write operations use single-message transfers
 
 ### State Machine Timing
 **CRITICAL**: The state machine polls at **0.1 second intervals**, not 1 second. This is essential for correct power management behavior.

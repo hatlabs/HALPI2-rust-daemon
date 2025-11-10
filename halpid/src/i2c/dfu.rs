@@ -148,10 +148,12 @@ impl HalpiDevice {
 
         loop {
             if start.elapsed() > timeout {
+                tracing::error!("DFU ready timeout after {:?}", timeout);
                 return Err(I2cError::DfuTimeout);
             }
 
             let status = self.get_dfu_status()?;
+            tracing::trace!("DFU status: {:?}", status);
 
             match status {
                 DFUState::Updating | DFUState::ReadyToCommit => {
@@ -160,10 +162,12 @@ impl HalpiDevice {
                 }
                 DFUState::Preparing => {
                     // Still preparing, wait longer
+                    tracing::trace!("DFU preparing, waiting...");
                     thread::sleep(Duration::from_millis(500));
                 }
                 DFUState::QueueFull => {
                     // Queue full, wait briefly
+                    tracing::trace!("DFU queue full, waiting...");
                     thread::sleep(Duration::from_millis(100));
                 }
                 DFUState::CrcError
@@ -171,10 +175,12 @@ impl HalpiDevice {
                 | DFUState::WriteError
                 | DFUState::ProtocolError => {
                     // Error state
+                    tracing::error!("DFU error state: {:?}", status);
                     return Err(I2cError::DfuError { state: status });
                 }
                 _ => {
                     // Unexpected state
+                    tracing::trace!("DFU unexpected state: {:?}, waiting...", status);
                     thread::sleep(Duration::from_millis(100));
                 }
             }
@@ -218,14 +224,27 @@ impl HalpiDevice {
         firmware: &[u8],
         mut progress: impl FnMut(usize, usize),
     ) -> Result<(), I2cError> {
-        // Start DFU
+        tracing::info!("Starting DFU with firmware size: {} bytes", firmware.len());
+
+        // Start DFU (match Python behavior - no abort first)
         self.start_dfu(firmware.len() as u32)?;
 
-        // Wait for device to be ready (matches Python wait_for_dfu_ready())
-        self.wait_for_dfu_ready(DFU_READY_TIMEOUT)?;
+        // Check status immediately after start
+        let status_after_start = self.get_dfu_status()?;
+        if matches!(
+            status_after_start,
+            DFUState::CrcError
+                | DFUState::DataLengthError
+                | DFUState::WriteError
+                | DFUState::ProtocolError
+        ) {
+            tracing::error!("DFU entered error state immediately after start: {:?}", status_after_start);
+            return Err(I2cError::DfuError { state: status_after_start });
+        }
 
         // Calculate total blocks
         let total_blocks = firmware.len().div_ceil(FLASH_BLOCK_SIZE);
+        tracing::info!("Uploading {} blocks", total_blocks);
 
         // Upload each block
         for (block_num, chunk) in firmware.chunks(FLASH_BLOCK_SIZE).enumerate() {
