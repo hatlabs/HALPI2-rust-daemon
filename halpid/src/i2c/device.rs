@@ -403,7 +403,11 @@ impl HalpiDevice {
     /// Returns `I2cError` if the timeout cannot be read.
     pub fn get_solo_depleting_timeout(&mut self) -> Result<u32, I2cError> {
         let bytes = self.read_bytes(protocol::REG_SOLO_DEPLETING_TIMEOUT, 4)?;
-        Ok(protocol::decode_u32(&bytes))
+        protocol::decode_u32(&bytes).map_err(|e| I2cError::Protocol {
+            reg: protocol::REG_SOLO_DEPLETING_TIMEOUT,
+            operation: "decode solo depleting timeout",
+            source: e,
+        })
     }
 
     /// Set solo depleting timeout in milliseconds
