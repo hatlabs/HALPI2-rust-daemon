@@ -87,11 +87,12 @@ impl HalpiDevice {
     /// This performs an atomic I2C transaction with automatic retry on transient errors.
     fn read_bytes(&mut self, reg: u8, count: usize) -> Result<Vec<u8>, I2cError> {
         self.retry_operation(|device| {
-            let mut buffer = vec![0u8; count];
-            device
-                .write(&[reg])
-                .and_then(|_| device.read(&mut buffer))
+            // Use SMBus block read which does a combined write-read transaction
+            // This is equivalent to Python's read_i2c_block_data()
+            let buffer = device
+                .smbus_read_i2c_block_data(reg, count as u8)
                 .map_err(|e| I2cError::Read { reg, source: e })?;
+            tracing::debug!("Read reg 0x{:02x}: {:02x?}", reg, buffer);
             Ok(buffer)
         })
     }
@@ -266,7 +267,10 @@ impl HalpiDevice {
 
     /// Set watchdog timeout in milliseconds
     ///
-    /// Set to 0 to disable the watchdog.
+    /// Set to 0 to disable the watchdog. Writing a non-zero value enables the watchdog
+    /// and also acts as a "feed" operation, resetting the timer.
+    ///
+    /// To keep the watchdog active, this must be called periodically before the timeout expires.
     ///
     /// # Errors
     /// Returns `I2cError` if the timeout cannot be written.
@@ -274,15 +278,16 @@ impl HalpiDevice {
         self.write_word(protocol::REG_WATCHDOG_TIMEOUT, timeout_ms)
     }
 
-    /// Feed the watchdog
+    /// Feed the watchdog by resetting its timeout
     ///
-    /// This resets the watchdog timer. Must be called periodically (typically every 5 seconds)
-    /// to prevent the watchdog from triggering a system shutdown.
+    /// This is equivalent to calling set_watchdog_timeout() with the same timeout value.
+    /// The firmware doesn't have a separate "feed" register - feeding is done by writing
+    /// the timeout value again to register 0x12.
     ///
     /// # Errors
-    /// Returns `I2cError` if the feed command cannot be written.
-    pub fn feed_watchdog(&mut self) -> Result<(), I2cError> {
-        self.write_byte(protocol::REG_WATCHDOG_FEED, 0x01)
+    /// Returns `I2cError` if the timeout cannot be written.
+    pub fn feed_watchdog(&mut self, timeout_ms: u16) -> Result<(), I2cError> {
+        self.set_watchdog_timeout(timeout_ms)
     }
 
     /// Set power-on voltage threshold (in volts)
@@ -305,20 +310,26 @@ impl HalpiDevice {
         )
     }
 
-    /// Enable or disable 5V output
+    /// Enable or disable Raspberry Pi power (which controls 5V output)
+    ///
+    /// Note: This actually controls the Raspberry Pi power state. When on, 5V is enabled.
+    /// The firmware register is named "Raspi power state", not "5V output enable".
     ///
     /// # Errors
     /// Returns `I2cError` if the state cannot be written.
     pub fn set_5v_output_enabled(&mut self, enabled: bool) -> Result<(), I2cError> {
-        self.write_byte(protocol::REG_EN5V_STATE, if enabled { 1 } else { 0 })
+        self.write_byte(protocol::REG_RASPI_POWER_STATE, if enabled { 1 } else { 0 })
     }
 
-    /// Get 5V output enable state
+    /// Get Raspberry Pi power state (5V output enable state)
+    ///
+    /// Note: This actually reads the Raspberry Pi power state. When on (1), 5V is enabled.
+    /// The firmware register is named "Raspi power state", not "5V output enable".
     ///
     /// # Errors
     /// Returns `I2cError` if the state cannot be read.
     pub fn get_5v_output_enabled(&mut self) -> Result<bool, I2cError> {
-        Ok(self.read_byte(protocol::REG_EN5V_STATE)? != 0)
+        Ok(self.read_byte(protocol::REG_RASPI_POWER_STATE)? != 0)
     }
 
     /// Set LED brightness (0-255)
