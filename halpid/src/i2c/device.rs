@@ -11,7 +11,7 @@
 
 use halpi_common::protocol::{self, ProtocolError};
 use halpi_common::types::{Measurements, PowerState, Version};
-use i2cdev::core::{I2CDevice, I2CMessage, I2CTransfer};
+use i2cdev::core::I2CTransfer;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError, LinuxI2CMessage};
 use std::thread;
 use std::time::Duration;

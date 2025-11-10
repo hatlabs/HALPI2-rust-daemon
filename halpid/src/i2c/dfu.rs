@@ -186,11 +186,6 @@ impl HalpiDevice {
                     tracing::error!("DFU error state: {:?}", status);
                     return Err(I2cError::DfuError { state: status });
                 }
-                _ => {
-                    // Unexpected state - use 50ms default polling delay
-                    tracing::trace!("DFU unexpected state: {:?}, waiting...", status);
-                    thread::sleep(Duration::from_millis(50));
-                }
             }
         }
     }
