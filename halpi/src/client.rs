@@ -241,6 +241,82 @@ impl HalpiClient {
         #[cfg(not(unix))]
         anyhow::bail!("Unix sockets not supported on this platform")
     }
+
+    /// Upload firmware file to device
+    pub async fn upload_firmware(&self, firmware_data: Vec<u8>, filename: &str) -> Result<()> {
+        #[cfg(unix)]
+        {
+            use http_body_util::Full;
+            use hyper::body::Bytes;
+            use hyper_util::client::legacy::Client;
+            use std::time::{SystemTime, UNIX_EPOCH};
+
+            // Generate a unique boundary for multipart form data
+            // Use timestamp as a simple alphanumeric boundary
+            let timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let boundary = format!("WebKitFormBoundary{}", timestamp);
+
+            // Construct multipart body manually
+            let mut body = Vec::new();
+
+            // Add firmware field (boundary in body has -- prefix)
+            body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+            body.extend_from_slice(
+                format!(
+                    "Content-Disposition: form-data; name=\"firmware\"; filename=\"{}\"\r\n",
+                    filename
+                )
+                .as_bytes(),
+            );
+            body.extend_from_slice(b"Content-Type: application/octet-stream\r\n");
+            body.extend_from_slice(b"\r\n");
+            body.extend_from_slice(&firmware_data);
+            body.extend_from_slice(b"\r\n");
+
+            // Add closing boundary (has -- prefix and -- suffix)
+            body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
+
+            // Send POST request using a separate client for binary bodies
+            let url = Uri::new(&self.socket_path, "/flash");
+            let content_type = format!("multipart/form-data; boundary={}", boundary);
+
+            // Create a client that can handle binary bodies
+            let binary_client: Client<UnixConnector, Full<Bytes>> = Client::unix();
+
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri::<hyper::Uri>(url.into())
+                .header("Content-Type", content_type)
+                .header("Content-Length", body.len())
+                .body(Full::new(Bytes::from(body)))
+                .context("Failed to build request")?;
+
+            let response = binary_client
+                .request(req)
+                .await
+                .context("Failed to connect to daemon")?;
+
+            let status = response.status();
+            if status != StatusCode::NO_CONTENT && status != StatusCode::OK {
+                let body_bytes = response
+                    .into_body()
+                    .collect()
+                    .await
+                    .context("Failed to read error response")?
+                    .to_bytes();
+                let error_msg = String::from_utf8_lossy(&body_bytes);
+                anyhow::bail!("Firmware upload failed ({}): {}", status, error_msg);
+            }
+
+            Ok(())
+        }
+
+        #[cfg(not(unix))]
+        anyhow::bail!("Unix sockets not supported on this platform")
+    }
 }
 
 impl Default for HalpiClient {
