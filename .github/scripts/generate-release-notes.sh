@@ -31,7 +31,7 @@ fi
 case "$RELEASE_TYPE" in
   prerelease)
     cat > release_notes.md <<EOF
-## Cockpit APT v${TAG_VERSION} (Pre-release)
+## HALPI2 Rust Daemon v${TAG_VERSION} (Pre-release)
 
 ⚠️ **This is a pre-release build from the main branch. Use for testing only.**
 
@@ -45,7 +45,7 @@ ${CHANGELOG}
 
 ### Installation
 
-To install this pre-release:
+To install this pre-release on your HALPI2:
 
 \`\`\`bash
 # Add Hat Labs repository (if not already added)
@@ -56,7 +56,7 @@ echo "deb [signed-by=/usr/share/keyrings/hatlabs-apt-key.gpg] https://apt.hatlab
 
 # Update and install
 sudo apt update
-sudo apt install cockpit-apt
+sudo apt install halpi2-daemon
 \`\`\`
 
 EOF
@@ -64,9 +64,9 @@ EOF
 
   draft)
     cat > release_notes.md <<EOF
-## Cockpit APT v${VERSION}
+## HALPI2 Rust Daemon v${VERSION}
 
-Modern Cockpit interface for APT package management on Debian, inspired by Raspberry Pi's Add/Remove Software.
+High-performance Rust reimplementation of the HALPI2 power monitor and watchdog daemon.
 
 ### Changes
 
@@ -74,31 +74,37 @@ ${CHANGELOG}
 
 ### Features
 
-- Browse packages by Debian sections
-- Search for packages across all sections
-- View detailed package information
-- Install and remove packages with progress tracking
-- Dark mode support
-- Accessible interface with keyboard navigation
+- **Power Management**: Monitor input voltage and supercapacitor charge, coordinate graceful shutdowns
+- **Watchdog**: Hardware watchdog integration for system hang detection and recovery
+- **HTTP API**: RESTful API over Unix socket for status and control
+- **CLI**: Comprehensive command-line interface (\`halpi\`)
+- **Firmware Updates**: Over-the-air firmware updates via I2C DFU protocol
+- **USB Port Control**: Power cycling capabilities for individual USB ports
+- **High Performance**: 5x memory reduction, 20x faster startup vs Python version
 
 ### Installation
 
-This is the source code release. For Debian packages, see [apt.hatlabs.fi](https://github.com/hatlabs/apt.hatlabs.fi).
+This is the source code release. For Debian packages:
+
+\`\`\`bash
+sudo apt install halpi2-daemon
+\`\`\`
+
+See [apt.hatlabs.fi](https://github.com/hatlabs/apt.hatlabs.fi) for repository setup.
 
 ### Development
 
 For development setup and build commands, see:
-- [README.md](https://github.com/hatlabs/cockpit-apt/blob/main/README.md) - Installation and usage
-- [CLAUDE.md](https://github.com/hatlabs/cockpit-apt/blob/main/CLAUDE.md) - Development guide
+- [README.md](https://github.com/hatlabs/HALPI2-rust-daemon/blob/main/README.md) - Installation and usage
 - \`./run help\` - Available build and development commands
 EOF
     ;;
 
   stable)
     cat > release_notes.md <<EOF
-## Cockpit APT v${VERSION}
+## HALPI2 Rust Daemon v${VERSION}
 
-Modern Cockpit interface for APT package management on Debian, inspired by Raspberry Pi's Add/Remove Software.
+High-performance Rust reimplementation of the HALPI2 power monitor and watchdog daemon.
 
 ### Changes
 
@@ -106,22 +112,28 @@ ${CHANGELOG}
 
 ### Features
 
-- Browse packages by Debian sections
-- Search for packages across all sections
-- View detailed package information
-- Install and remove packages with progress tracking
-- Dark mode support
-- Accessible interface with keyboard navigation
+- **Power Management**: Monitor input voltage and supercapacitor charge, coordinate graceful shutdowns
+- **Watchdog**: Hardware watchdog integration for system hang detection and recovery
+- **HTTP API**: RESTful API over Unix socket for status and control
+- **CLI**: Comprehensive command-line interface (\`halpi\`)
+- **Firmware Updates**: Over-the-air firmware updates via I2C DFU protocol
+- **USB Port Control**: Power cycling capabilities for individual USB ports
+- **High Performance**: 5x memory reduction, 20x faster startup vs Python version
 
 ### Installation
 
-This is the source code release. For Debian packages, see [apt.hatlabs.fi](https://github.com/hatlabs/apt.hatlabs.fi).
+This is the source code release. For Debian packages:
+
+\`\`\`bash
+sudo apt install halpi2-daemon
+\`\`\`
+
+See [apt.hatlabs.fi](https://github.com/hatlabs/apt.hatlabs.fi) for repository setup.
 
 ### Development
 
 For development setup and build commands, see:
-- [README.md](https://github.com/hatlabs/cockpit-apt/blob/main/README.md) - Installation and usage
-- [CLAUDE.md](https://github.com/hatlabs/cockpit-apt/blob/main/CLAUDE.md) - Development guide
+- [README.md](https://github.com/hatlabs/HALPI2-rust-daemon/blob/main/README.md) - Installation and usage
 - \`./run help\` - Available build and development commands
 EOF
     ;;
