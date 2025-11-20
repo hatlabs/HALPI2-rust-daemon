@@ -1,7 +1,10 @@
 //! Firmware flash command implementation
 
-use anyhow::Result;
+use anyhow::{Context, Result};
+use std::fs;
 use std::path::Path;
+
+use crate::client::HalpiClient;
 
 /// Upload firmware to the device
 pub async fn flash(firmware_path: &str) -> Result<()> {
@@ -15,17 +18,30 @@ pub async fn flash(firmware_path: &str) -> Result<()> {
         anyhow::bail!("Path is not a file: {}", firmware_path);
     }
 
-    // For now, provide instructions to use curl or similar
-    // Full multipart upload implementation requires additional dependencies
-    println!("Firmware upload via CLI is not yet implemented.");
-    println!();
-    println!("To upload firmware, use curl:");
-    println!(
-        "  curl -X POST -F \"firmware=@{}\" --unix-socket /run/halpid/halpid.sock http://localhost/flash",
-        firmware_path
-    );
-    println!();
-    println!("Or access the daemon's HTTP API directly.");
+    // Get the filename for the multipart form
+    let filename = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("firmware.bin");
+
+    // Read firmware file
+    println!("Reading firmware file: {}", firmware_path);
+    let firmware_data = fs::read(path)
+        .with_context(|| format!("Failed to read firmware file: {}", firmware_path))?;
+
+    let file_size = firmware_data.len();
+    println!("Firmware size: {} bytes", file_size);
+
+    if firmware_data.is_empty() {
+        anyhow::bail!("Firmware file is empty");
+    }
+
+    // Upload firmware
+    println!("Uploading firmware to device...");
+    let client = HalpiClient::new();
+    client.upload_firmware(firmware_data, filename).await?;
+
+    println!("Firmware uploaded successfully");
 
     Ok(())
 }

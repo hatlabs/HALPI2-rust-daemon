@@ -27,11 +27,8 @@ use std::time::Duration;
 /// Maximum block size for firmware upload (flash sector size)
 pub const FLASH_BLOCK_SIZE: usize = 4096;
 
-/// Maximum number of retries when firmware queue is full
-const QUEUE_FULL_MAX_RETRIES: usize = 10;
-
-/// Delay between retries when queue is full
-const QUEUE_FULL_RETRY_DELAY: Duration = Duration::from_millis(100);
+/// Timeout for waiting for DFU ready state
+const DFU_READY_TIMEOUT: Duration = Duration::from_secs(30);
 
 impl HalpiDevice {
     /// Start a firmware update process
@@ -132,6 +129,67 @@ impl HalpiDevice {
         self.write_byte(protocol::REG_DFU_ABORT, 0x00)
     }
 
+    /// Wait until the DFU system is ready to receive data
+    ///
+    /// This polls the DFU status until the device enters UPDATING or READY_TO_COMMIT state,
+    /// indicating it's ready to receive firmware blocks. Handles PREPARING and QUEUE_FULL
+    /// states with appropriate delays.
+    ///
+    /// # Arguments
+    /// * `timeout` - Maximum time to wait for ready state
+    ///
+    /// # Errors
+    /// Returns `I2cError` if:
+    /// - The timeout is exceeded
+    /// - The device enters an error state
+    /// - An I2C communication error occurs
+    fn wait_for_dfu_ready(&mut self, timeout: Duration) -> Result<(), I2cError> {
+        let start = std::time::Instant::now();
+
+        loop {
+            if start.elapsed() > timeout {
+                tracing::error!("DFU ready timeout after {:?}", timeout);
+                return Err(I2cError::DfuTimeout);
+            }
+
+            let status = self.get_dfu_status()?;
+            tracing::trace!("DFU status: {:?}", status);
+
+            match status {
+                DFUState::Updating | DFUState::ReadyToCommit => {
+                    // Device is ready
+                    return Ok(());
+                }
+                DFUState::Preparing => {
+                    // Still preparing, wait longer
+                    tracing::trace!("DFU preparing, waiting...");
+                    thread::sleep(Duration::from_millis(500));
+                }
+                DFUState::QueueFull => {
+                    // Queue full, wait briefly
+                    tracing::trace!("DFU queue full, waiting...");
+                    thread::sleep(Duration::from_millis(100));
+                }
+                DFUState::Idle => {
+                    // IDLE state means DFU was not started or was aborted
+                    tracing::error!("DFU in IDLE state during upload");
+                    return Err(I2cError::DfuUnexpectedState {
+                        expected: DFUState::Updating,
+                        actual: status,
+                    });
+                }
+                DFUState::CrcError
+                | DFUState::DataLengthError
+                | DFUState::WriteError
+                | DFUState::ProtocolError => {
+                    // Error state
+                    tracing::error!("DFU error state: {:?}", status);
+                    return Err(I2cError::DfuError { state: status });
+                }
+            }
+        }
+    }
+
     /// Upload entire firmware with progress callback
     ///
     /// This is a high-level method that handles the complete firmware update process:
@@ -169,87 +227,112 @@ impl HalpiDevice {
         firmware: &[u8],
         mut progress: impl FnMut(usize, usize),
     ) -> Result<(), I2cError> {
-        // Start DFU
+        tracing::info!("Starting DFU with firmware size: {} bytes", firmware.len());
+
+        // Start DFU (match Python behavior - no abort first)
         self.start_dfu(firmware.len() as u32)?;
+
+        // Check status immediately after start
+        let status_after_start = self.get_dfu_status()?;
+        if matches!(
+            status_after_start,
+            DFUState::CrcError
+                | DFUState::DataLengthError
+                | DFUState::WriteError
+                | DFUState::ProtocolError
+        ) {
+            tracing::error!(
+                "DFU entered error state immediately after start: {:?}",
+                status_after_start
+            );
+            return Err(I2cError::DfuError {
+                state: status_after_start,
+            });
+        }
 
         // Calculate total blocks
         let total_blocks = firmware.len().div_ceil(FLASH_BLOCK_SIZE);
+        tracing::info!("Uploading {} blocks", total_blocks);
 
         // Upload each block
         for (block_num, chunk) in firmware.chunks(FLASH_BLOCK_SIZE).enumerate() {
-            // Upload block with retry on QUEUE_FULL
-            self.upload_block_with_retry(block_num as u16, chunk)?;
+            // Pre-block delay (matches Python line 465: time.sleep(0.1))
+            thread::sleep(Duration::from_millis(100));
 
-            // Check for error states
-            let status = self.get_dfu_status()?;
-            if matches!(
-                status,
-                DFUState::CrcError
-                    | DFUState::DataLengthError
-                    | DFUState::WriteError
-                    | DFUState::ProtocolError
-            ) {
-                // Abort on error
+            // Wait for device ready before upload (matches Python wait_for_dfu_ready())
+            if let Err(e) = self.wait_for_dfu_ready(DFU_READY_TIMEOUT) {
                 let _ = self.abort_dfu();
-                return Err(I2cError::DfuError { state: status });
+                return Err(e);
+            }
+
+            // Upload block (check status BEFORE upload, not after)
+            if let Err(e) = self.upload_block(block_num as u16, chunk) {
+                let _ = self.abort_dfu();
+                return Err(e);
             }
 
             // Report progress
             progress(block_num + 1, total_blocks);
         }
 
-        // Verify final state
-        let status = self.get_dfu_status()?;
-        if status != DFUState::ReadyToCommit {
-            let _ = self.abort_dfu();
-            return Err(I2cError::DfuUnexpectedState {
-                expected: DFUState::ReadyToCommit,
-                actual: status,
-            });
+        // Final verification loop (matches Python lines 483-511)
+        // Wait until blocks_written == total_blocks AND status == ReadyToCommit
+        let verify_start = std::time::Instant::now();
+        let verify_timeout = Duration::from_secs(5);
+
+        loop {
+            if verify_start.elapsed() > verify_timeout {
+                let _ = self.abort_dfu();
+                return Err(I2cError::DfuTimeout);
+            }
+
+            thread::sleep(Duration::from_millis(100));
+            let status = match self.get_dfu_status() {
+                Ok(s) => s,
+                Err(e) => {
+                    let _ = self.abort_dfu();
+                    return Err(e);
+                }
+            };
+
+            thread::sleep(Duration::from_millis(100));
+            let blocks_written = match self.get_blocks_written() {
+                Ok(b) => b,
+                Err(e) => {
+                    let _ = self.abort_dfu();
+                    return Err(e);
+                }
+            };
+
+            // Check success condition FIRST (matches Python implementation)
+            if status == DFUState::ReadyToCommit && blocks_written == total_blocks as u16 {
+                break;
+            }
+
+            // THEN check for error states (only if continuing loop)
+            if matches!(
+                status,
+                DFUState::Idle
+                    | DFUState::CrcError
+                    | DFUState::DataLengthError
+                    | DFUState::WriteError
+                    | DFUState::ProtocolError
+            ) {
+                let _ = self.abort_dfu();
+                return Err(I2cError::DfuError { state: status });
+            }
+
+            // 500ms delay before next iteration (matches Python implementation)
+            thread::sleep(Duration::from_millis(500));
         }
+
+        // Pre-commit delay (matches Python line 516)
+        thread::sleep(Duration::from_millis(100));
 
         // Commit the update
         self.commit_dfu()?;
 
         Ok(())
-    }
-
-    /// Upload a block with automatic retry on QUEUE_FULL
-    fn upload_block_with_retry(&mut self, block_num: u16, data: &[u8]) -> Result<(), I2cError> {
-        for attempt in 0..QUEUE_FULL_MAX_RETRIES {
-            // Upload the block
-            self.upload_block(block_num, data)?;
-
-            // Check status
-            let status = self.get_dfu_status()?;
-
-            match status {
-                DFUState::QueueFull => {
-                    // Queue is full, wait and retry
-                    if attempt < QUEUE_FULL_MAX_RETRIES - 1 {
-                        thread::sleep(QUEUE_FULL_RETRY_DELAY);
-                        continue;
-                    } else {
-                        // Max retries exceeded
-                        return Err(I2cError::DfuQueueFullTimeout);
-                    }
-                }
-                DFUState::Updating => {
-                    // Block accepted
-                    return Ok(());
-                }
-                _ => {
-                    // Unexpected state
-                    return Err(I2cError::DfuUnexpectedState {
-                        expected: DFUState::Updating,
-                        actual: status,
-                    });
-                }
-            }
-        }
-
-        // Should never reach here
-        Err(I2cError::DfuQueueFullTimeout)
     }
 }
 

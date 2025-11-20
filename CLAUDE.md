@@ -107,8 +107,8 @@ The CI workflow (`.github/workflows/build.yml`) runs three jobs:
 2. **Test job**:
    - `cargo test --verbose`
 
-3. **Build job** (matrix: x86_64-unknown-linux-gnu, aarch64-unknown-linux-musl):
-   - `cargo build --release --target $TARGET`
+3. **Build job**:
+   - `cargo build --release --target aarch64-unknown-linux-musl`
 
 **Common pitfalls**:
 - **Trait imports**: Always explicitly import traits needed for method calls (e.g., `use chrono::TimeZone`). macOS and Linux environments may have different implicit imports.
@@ -188,8 +188,15 @@ When implementing features, always verify compatibility with the Python version:
 ### I2C Communication
 - Bus: I2C bus 1
 - Address: 0x6d (HALPI2 RP2040 firmware)
-- Registers: See `halpi-common/src/i2c.rs` for register definitions
+- Registers: See `halpi-common/src/protocol.rs` for register definitions
 - Reference: `halpid/src/i2c.py` in Python implementation
+
+**CRITICAL: The firmware uses raw I2C protocol, NOT SMBus protocol.**
+- Python's `smbus2` library is used for raw I2C operations via `i2c_rdwr()`
+- In Rust, use `LinuxI2CMessage` with `transfer()` to match Python's behavior
+- All operations (reads and writes) must use `transfer()` API, not SMBus functions
+- Read operations require combined write-read transactions with repeated START
+- Write operations use single-message transfers
 
 ### State Machine Timing
 **CRITICAL**: The state machine polls at **0.1 second intervals**, not 1 second. This is essential for correct power management behavior.
@@ -273,7 +280,7 @@ When implementing features, always verify compatibility with the Python version:
 
 - **Runtime**: Linux-only (requires I2C device access). Development and testing on macOS is supported via cross-compilation and Docker containers for non-hardware tests.
 - **MSRV**: Rust 1.91+ (required for edition 2024)
-- **Target**: aarch64-unknown-linux-musl for deployment, x86_64-unknown-linux-gnu for Linux testing
+- **Target**: aarch64-unknown-linux-musl only (ARM64 Linux)
 - **API Compatibility**: 100% backward compatible with Python halpid 4.x
 - **State Machine**: 0.1 second polling interval
 - **Runs as root**: Required for I2C access and shutdown privileges
