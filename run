@@ -18,16 +18,16 @@ function build {
   cargo build $@
 }
 
-function build:daemon {
+function build-daemon {
   #@ Build the halpid daemon
-  #@ Usage: build:daemon [--release]
+  #@ Usage: build-daemon [--release]
   #@ Category: Core Development
   cargo build -p halpid $@
 }
 
-function build:cli {
+function build-cli {
   #@ Build the halpi CLI
-  #@ Usage: build:cli [--release]
+  #@ Usage: build-cli [--release]
   #@ Category: Core Development
   cargo build -p halpi $@
 }
@@ -45,13 +45,13 @@ function check {
   cargo clippy --all-targets -- -D warnings
 }
 
-function fmt {
+function format {
   #@ Format code with rustfmt
   #@ Category: Core Development
   cargo fmt --all
 }
 
-function fmt:check {
+function check-format {
   #@ Check code formatting without making changes
   #@ Category: Core Development
   cargo fmt --all -- --check
@@ -60,19 +60,19 @@ function fmt:check {
 ################################################################################
 # Cross-Compilation Commands
 
-function build:cross {
+function cross-build {
   #@ Build for ARM64 Linux using cross
-  #@ Usage: build:cross [--release]
+  #@ Usage: cross-build [--release]
   #@ Category: Cross-Compilation
   if ! command -v cross &> /dev/null; then
-    echo "Error: 'cross' not found. Run './run cross:setup' first."
+    echo "Error: 'cross' not found. Run './run setup-cross' first."
     exit 1
   fi
 
   cross build --target aarch64-unknown-linux-musl $@
 }
 
-function cross:setup {
+function setup-cross {
   #@ Install cross-compilation tools
   #@ Category: Cross-Compilation
   cargo install cross
@@ -88,19 +88,19 @@ function test {
   cargo test $@
 }
 
-function test:unit {
+function test-unit {
   #@ Run unit tests only
   #@ Category: Testing
   cargo test --lib $@
 }
 
-function test:integration {
+function test-integration {
   #@ Run integration tests only
   #@ Category: Testing
   cargo test --test '*' $@
 }
 
-function test:coverage {
+function test-coverage {
   #@ Run tests with coverage (requires cargo-tarpaulin)
   #@ Category: Testing
   if ! command -v cargo-tarpaulin &> /dev/null; then
@@ -129,9 +129,9 @@ _detect_docker_platform() {
   esac
 }
 
-function build:docker {
+function docker-build {
   #@ Build in Docker container (automatic Linux environment)
-  #@ Usage: build:docker [--release]
+  #@ Usage: docker-build [--release]
   #@ Category: Docker Build
   local build_args="$@"
 
@@ -153,9 +153,9 @@ function build:docker {
     " && echo "✅ Build successful in Docker container"
 }
 
-function build:docker:cross {
-  #@ Cross-compile for ARM64 Linux using cross
-  #@ Usage: build:docker:cross [--release]
+function docker-cross-build {
+  #@ Cross-compile for ARM64 Linux using cross in Docker
+  #@ Usage: docker-cross-build [--release]
   #@ Category: Docker Build
   local build_args="$@"
 
@@ -212,9 +212,9 @@ function build:docker:cross {
     }
 }
 
-function package:deb:docker {
+function docker-build-deb {
   #@ Build Debian package for ARM64 in Docker container
-  #@ Usage: package:deb:docker
+  #@ Usage: docker-build-deb
   #@ Category: Docker Build
 
   echo "🏗️  Building Debian package for ARM64 in Docker container..."
@@ -279,7 +279,7 @@ function package:deb:docker {
 ################################################################################
 # Package Management Commands
 
-function package:deb {
+function build-deb {
   #@ Build Debian package (native)
   #@ Category: Package Management
   echo "🏗️ Building Debian package..."
@@ -293,13 +293,13 @@ function package:deb {
   echo "✅ Debian package built successfully"
 }
 
-function package:deb:cross {
+function cross-build-deb {
   #@ Build Debian package for ARM64 using cross
   #@ Category: Package Management
   echo "🏗️ Building ARM64 Debian package..."
 
   # First build release binary for ARM64
-  build:cross --release
+  cross-build --release
 
   # Then build package
   if ! command -v cargo-deb &> /dev/null; then
@@ -314,15 +314,15 @@ function package:deb:cross {
 ################################################################################
 # Development Utilities
 
-function dev:daemon {
+function run-daemon {
   #@ Run daemon in development mode
-  #@ Category: Development
+  #@ Category: Development Utilities
   cargo run -p halpid
 }
 
-function dev:clean:all {
+function clean-all {
   #@ Deep clean (cargo + artifacts + packages)
-  #@ Category: Development
+  #@ Category: Development Utilities
   clean
   rm -rf target/debian
   rm -rf target/coverage
@@ -332,75 +332,42 @@ function dev:clean:all {
 function bumpversion {
   #@ Bump version using bumpversion tool
   #@ Usage: bumpversion [patch|minor|major] or bumpversion --new-version X.Y.Z patch
-  #@ Category: Development
+  #@ Category: Development Utilities
   command bumpversion "$@"
 }
 
 function version {
   #@ Show current project version
-  #@ Category: Development
+  #@ Category: Development Utilities
   cat VERSION
 }
 
-function dev:version:bump {
-  #@ Bump version to specified version (deprecated - use bumpversion)
-  #@ Usage: dev:version:bump <version>
-  #@ Category: Development
-  local new_version=$1
-
-  if [ -z "$new_version" ]; then
-    echo "Error: Version required. Usage: ./run dev:version:bump <version>"
-    exit 1
-  fi
-
-  echo "⚠️  Warning: dev:version:bump is deprecated. Use 'bumpversion --new-version $new_version patch' instead"
-  echo "Bumping version to $new_version..."
-  command bumpversion --new-version "$new_version" patch
-  echo "✅ Version bumped to $new_version"
-  echo "Run 'cargo update' to update Cargo.lock"
-}
-
-function dev:version:show {
-  #@ Show current version (deprecated - use version)
-  #@ Category: Development
-  cat VERSION
-}
-
-################################################################################
-# Release/Version Commands
-
-function release:version {
-  #@ Get current version (deprecated - use version)
-  #@ Category: Release/Version
-  dev:version:show
-}
-
-function release:build {
+function build-release {
   #@ Build release artifacts for ARM64
-  #@ Category: Release/Version
+  #@ Category: Development Utilities
   echo "🏗️ Building release artifacts for ARM64..."
-  build:cross --release
+  cross-build --release
   echo "✅ Release artifacts built in target/aarch64-unknown-linux-musl/release/"
 }
 
 ################################################################################
 # CI/CD Commands
 
-function ci:check {
+function ci-check {
   #@ Run CI verification checks
   #@ Category: CI/CD
   echo "🔍 Running CI checks..."
   check
-  fmt:check
+  check-format
   test
   echo "✅ All CI checks passed"
 }
 
-function ci:build {
+function ci-build {
   #@ Full CI build pipeline
   #@ Category: CI/CD
   echo "🚀 Running full CI build pipeline..."
-  ci:check
+  ci-check
   build --release
   echo "✅ CI build complete"
 }
@@ -410,55 +377,42 @@ function ci:build {
 
 function help {
   #@ Show this help message
-  #@ Category: Help
-  echo "HALPI2 Rust Daemon Development Commands"
-  echo
-  echo "Usage: ./run <command> [arguments]"
-  echo
+  #@ Category: Core
+  echo "Available commands:"
+  echo ""
 
-  # Extract categories and commands
-  declare -A categories
-  while IFS= read -r line; do
-    if [[ $line =~ ^function\ ([a-zA-Z0-9_:]+) ]]; then
-      func_name="${BASH_REMATCH[1]}"
+  # Extract function definitions and their help comments
+  awk '/^function / {
+    fname = $2
+    sub(/[({].*/, "", fname)
+    getline
+    if ($0 ~ /#@/) {
+      desc = $0
+      sub(/.*#@ /, "", desc)
+      sub(/ *$/, "", desc)
+      getline
+      if ($0 ~ /#@ Category:/) {
+        cat = $0
+        sub(/.*Category: /, "", cat)
+        sub(/ *$/, "", cat)
+        if (!seen[cat]++) categories[++cat_count] = cat
+        commands[cat, ++cmd_count[cat]] = fname
+        descriptions[cat, cmd_count[cat]] = desc
+      }
+    }
+  }
+  END {
+    for (i = 1; i <= cat_count; i++) {
+      cat = categories[i]
+      print "\n" cat ":"
+      for (j = 1; j <= cmd_count[cat]; j++) {
+        printf "  %-30s %s\n", commands[cat, j], descriptions[cat, j]
+      }
+    }
+  }' "$0"
 
-      # Read the next lines for documentation
-      desc=""
-      usage=""
-      category="General"
-
-      while IFS= read -r doc_line; do
-        if [[ $doc_line =~ ^[[:space:]]*#@[[:space:]]+(.*) ]]; then
-          content="${BASH_REMATCH[1]}"
-          if [[ $content =~ ^Usage:[[:space:]]+(.*) ]]; then
-            usage="${BASH_REMATCH[1]}"
-          elif [[ $content =~ ^Category:[[:space:]]+(.*) ]]; then
-            category="${BASH_REMATCH[1]}"
-          else
-            desc="$content"
-          fi
-        else
-          break
-        fi
-      done
-
-      # Store command in category
-      if [ -n "$desc" ]; then
-        cmd_info="  $func_name"
-        [ -n "$usage" ] && cmd_info="$cmd_info [$usage]"
-        cmd_info="$cmd_info - $desc"
-        categories[$category]+="$cmd_info"$'\n'
-      fi
-    fi
-  done < "$0"
-
-  # Print categories in order
-  for category in "Core Development" "Cross-Compilation" "Testing" "Package Management" "Development" "Release/Version" "CI/CD" "Help"; do
-    if [ -n "${categories[$category]}" ]; then
-      echo "$category:"
-      echo "${categories[$category]}"
-    fi
-  done
+  echo ""
+  echo "Usage: ./run <command> [arguments...]"
 }
 
 ################################################################################
@@ -473,9 +427,6 @@ fi
 # Get the command name
 cmd=$1
 shift
-
-# Replace - with : for command names (allows both ./run build:daemon and ./run build-daemon)
-cmd=${cmd//-/:}
 
 # Check if function exists
 if declare -f "$cmd" > /dev/null; then
