@@ -1,133 +1,147 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+# Generate release notes for a release
+# Usage: generate-release-notes.sh <VERSION> <TAG_VERSION> <RELEASE_TYPE>
+# RELEASE_TYPE: "prerelease", "draft", or "stable"
 
-# Generate polished release notes for HALPI2 Rust Daemon releases
-# Usage: generate-release-notes.sh <version> [last_tag] [repository] [template_path]
+set -e
 
-VERSION="${1:-}"
-LAST_TAG="${2:-}"
-REPOSITORY="${3:-hatlabs/HALPI2-rust-daemon}"
-TEMPLATE="${4:-$(dirname "$0")/../templates/release-notes.md.template}"
+VERSION="${1:?Version required}"
+TAG_VERSION="${2:?Tag version required}"
+RELEASE_TYPE="${3:?Release type required}"
 
-if [ -z "$VERSION" ]; then
-    echo "Error: Version required" >&2
-    echo "Usage: $0 <version> [last_tag] [repository] [template_path]" >&2
-    exit 1
+if [ -z "$VERSION" ] || [ -z "$TAG_VERSION" ] || [ -z "$RELEASE_TYPE" ]; then
+  echo "Usage: generate-release-notes.sh <VERSION> <TAG_VERSION> <RELEASE_TYPE>"
+  exit 1
 fi
 
-if [ ! -f "$TEMPLATE" ]; then
-    echo "Error: Template file not found: $TEMPLATE" >&2
-    exit 1
-fi
+SHORT_SHA="${GITHUB_SHA:0:7}"
 
-# Determine changelog range
+# Get the latest published (non-prerelease) release
+LAST_TAG=$(gh release list --limit 100 --json tagName,isPrerelease,isDraft \
+  --jq '.[] | select(.isDraft == false and .isPrerelease == false) | .tagName' | head -n1)
+
 if [ -n "$LAST_TAG" ]; then
-    echo "Generating changelog since $LAST_TAG" >&2
-    CHANGELOG_RANGE="${LAST_TAG}..HEAD"
+  echo "Generating changelog since $LAST_TAG"
+  CHANGELOG=$(git log "${LAST_TAG}"..HEAD --pretty=format:"- %s (%h)" --no-merges --)
 else
-    echo "No previous release found, using all commits" >&2
-    CHANGELOG_RANGE="HEAD"
+  echo "No previous published releases found, using recent commits"
+  CHANGELOG=$(git log -10 --pretty=format:"- %s (%h)" --no-merges)
 fi
 
-# Categorize commits by conventional commit type
-# Using git log with --grep to filter by commit message patterns
-# Using extended-regexp and anchoring to [:(] ensures we only match subject lines
-FEATURES=$(git log "$CHANGELOG_RANGE" --pretty=format:"- **%s**" --no-merges --extended-regexp --grep="^feat[:(]" || true)
-FIXES=$(git log "$CHANGELOG_RANGE" --pretty=format:"- **%s**" --no-merges --extended-regexp --grep="^fix[:(]" || true)
-IMPROVEMENTS=$(git log "$CHANGELOG_RANGE" --pretty=format:"- **%s**" --no-merges --extended-regexp --grep="^(refactor|perf|chore|build|ci)[:(]" || true)
-DOCS=$(git log "$CHANGELOG_RANGE" --pretty=format:"- **%s**" --no-merges --extended-regexp --grep="^docs[:(]" || true)
-TESTS=$(git log "$CHANGELOG_RANGE" --pretty=format:"- **%s**" --no-merges --extended-regexp --grep="^test[:(]" || true)
+case "$RELEASE_TYPE" in
+  prerelease)
+    cat > release_notes.md <<EOF
+## HALPI2 Rust Daemon v${TAG_VERSION} (Pre-release)
 
-# Count commits in each category (safely handle empty strings)
-FEAT_COUNT=0
-if [ -n "$FEATURES" ]; then
-    FEAT_COUNT=$(echo "$FEATURES" | grep -c "^- " || echo "0")
-fi
+⚠️ **This is a pre-release build from the main branch. Use for testing only.**
 
-FIX_COUNT=0
-if [ -n "$FIXES" ]; then
-    FIX_COUNT=$(echo "$FIXES" | grep -c "^- " || echo "0")
-fi
+**Build Information:**
+- Commit: ${SHORT_SHA} (\`${GITHUB_SHA}\`)
+- Built: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 
-IMP_COUNT=0
-if [ -n "$IMPROVEMENTS" ]; then
-    IMP_COUNT=$(echo "$IMPROVEMENTS" | grep -c "^- " || echo "0")
-fi
+### Recent Changes
 
-DOC_COUNT=0
-if [ -n "$DOCS" ]; then
-    DOC_COUNT=$(echo "$DOCS" | grep -c "^- " || echo "0")
-fi
+${CHANGELOG}
 
-TEST_COUNT=0
-if [ -n "$TESTS" ]; then
-    TEST_COUNT=$(echo "$TESTS" | grep -c "^- " || echo "0")
-fi
+### Installation
 
-# Build section content with headers
-FEATURES_SECTION=""
-if [ "$FEAT_COUNT" -gt 0 ]; then
-    FEATURES_SECTION="## ✨ New Features
+To install this pre-release on your HALPI2:
 
-$FEATURES
+\`\`\`bash
+# Add Hat Labs repository (if not already added)
+curl -fsSL https://apt.hatlabs.fi/hat-labs-apt-key.asc | sudo gpg --dearmor -o /usr/share/keyrings/hatlabs-apt-key.gpg
 
-"
-fi
+# Add unstable channel
+echo "deb [signed-by=/usr/share/keyrings/hatlabs-apt-key.gpg] https://apt.hatlabs.fi unstable main" | sudo tee /etc/apt/sources.list.d/hatlabs-unstable.list
 
-FIXES_SECTION=""
-if [ "$FIX_COUNT" -gt 0 ]; then
-    FIXES_SECTION="## 🐛 Bug Fixes
+# Update and install
+sudo apt update
+sudo apt install halpi2-daemon
+\`\`\`
 
-$FIXES
+EOF
+    ;;
 
-"
-fi
+  draft)
+    cat > release_notes.md <<EOF
+## HALPI2 Rust Daemon v${VERSION}
 
-IMPROVEMENTS_SECTION=""
-if [ "$IMP_COUNT" -gt 0 ]; then
-    IMPROVEMENTS_SECTION="## 🔧 Improvements
+High-performance Rust reimplementation of the HALPI2 power monitor and watchdog daemon.
 
-$IMPROVEMENTS
+### Changes
 
-"
-fi
+${CHANGELOG}
 
-DOCS_SECTION=""
-if [ "$DOC_COUNT" -gt 0 ]; then
-    DOCS_SECTION="## 📚 Documentation
+### Features
 
-$DOCS
+- **Power Management**: Monitor input voltage and supercapacitor charge, coordinate graceful shutdowns
+- **Watchdog**: Hardware watchdog integration for system hang detection and recovery
+- **HTTP API**: RESTful API over Unix socket for status and control
+- **CLI**: Comprehensive command-line interface (\`halpi\`)
+- **Firmware Updates**: Over-the-air firmware updates via I2C DFU protocol
+- **USB Port Control**: Power cycling capabilities for individual USB ports
+- **High Performance**: 5x memory reduction, 20x faster startup vs Python version
 
-"
-fi
+### Installation
 
-TESTS_SECTION=""
-if [ "$TEST_COUNT" -gt 0 ]; then
-    TESTS_SECTION="## 🧪 Testing
+This is the source code release. For Debian packages:
 
-$TESTS
+\`\`\`bash
+sudo apt install halpi2-daemon
+\`\`\`
 
-"
-fi
+See [apt.hatlabs.fi](https://github.com/hatlabs/apt.hatlabs.fi) for repository setup.
 
-# Build changelog link
-CHANGELOG_LINK=""
-if [ -n "$LAST_TAG" ]; then
-    CHANGELOG_LINK="---
+### Development
 
-**Full Changelog**: [$LAST_TAG...v$VERSION](https://github.com/$REPOSITORY/compare/$LAST_TAG...v$VERSION)"
-fi
+For development setup and build commands, see:
+- [README.md](https://github.com/hatlabs/HALPI2-rust-daemon/blob/main/README.md) - Installation and usage
+- \`./run help\` - Available build and development commands
+EOF
+    ;;
 
-# Read template and perform substitutions
-# Use a temporary variable to avoid subshell issues with sed
-NOTES=$(cat "$TEMPLATE")
-NOTES="${NOTES//\{\{VERSION\}\}/$VERSION}"
-NOTES="${NOTES//\{\{FEATURES\}\}/$FEATURES_SECTION}"
-NOTES="${NOTES//\{\{FIXES\}\}/$FIXES_SECTION}"
-NOTES="${NOTES//\{\{IMPROVEMENTS\}\}/$IMPROVEMENTS_SECTION}"
-NOTES="${NOTES//\{\{DOCS\}\}/$DOCS_SECTION}"
-NOTES="${NOTES//\{\{TESTS\}\}/$TESTS_SECTION}"
-NOTES="${NOTES//\{\{CHANGELOG_LINK\}\}/$CHANGELOG_LINK}"
+  stable)
+    cat > release_notes.md <<EOF
+## HALPI2 Rust Daemon v${VERSION}
 
-# Output the final release notes
-echo "$NOTES"
+High-performance Rust reimplementation of the HALPI2 power monitor and watchdog daemon.
+
+### Changes
+
+${CHANGELOG}
+
+### Features
+
+- **Power Management**: Monitor input voltage and supercapacitor charge, coordinate graceful shutdowns
+- **Watchdog**: Hardware watchdog integration for system hang detection and recovery
+- **HTTP API**: RESTful API over Unix socket for status and control
+- **CLI**: Comprehensive command-line interface (\`halpi\`)
+- **Firmware Updates**: Over-the-air firmware updates via I2C DFU protocol
+- **USB Port Control**: Power cycling capabilities for individual USB ports
+- **High Performance**: 5x memory reduction, 20x faster startup vs Python version
+
+### Installation
+
+This is the source code release. For Debian packages:
+
+\`\`\`bash
+sudo apt install halpi2-daemon
+\`\`\`
+
+See [apt.hatlabs.fi](https://github.com/hatlabs/apt.hatlabs.fi) for repository setup.
+
+### Development
+
+For development setup and build commands, see:
+- [README.md](https://github.com/hatlabs/HALPI2-rust-daemon/blob/main/README.md) - Installation and usage
+- \`./run help\` - Available build and development commands
+EOF
+    ;;
+
+  *)
+    echo "Error: Unknown RELEASE_TYPE '$RELEASE_TYPE'. Use 'prerelease', 'draft', or 'stable'"
+    exit 1
+    ;;
+esac
+
+echo "Release notes created"

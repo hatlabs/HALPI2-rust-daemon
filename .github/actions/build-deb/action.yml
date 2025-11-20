@@ -1,0 +1,39 @@
+name: 'Build Debian Package'
+description: 'Build Rust daemon and create .deb package'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Setup cross-compilation
+      uses: taiki-e/setup-cross-toolchain-action@v1
+      with:
+        target: aarch64-unknown-linux-musl
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: aarch64-unknown-linux-musl
+
+    - name: Build for aarch64
+      run: cargo build --release --target aarch64-unknown-linux-musl
+      shell: bash
+
+    - name: Install dpkg-dev
+      run: sudo apt-get update && sudo apt-get install -y dpkg-dev
+      shell: bash
+
+    - name: Build Debian package
+      run: dpkg-buildpackage -b -uc -us
+      shell: bash
+
+    - name: Move package to root
+      run: mv ../halpi2-rust-daemon_*.deb ./
+      shell: bash
+
+    - name: List generated packages
+      run: |
+        echo "📦 Generated packages:"
+        ls -lh *.deb
+      shell: bash
