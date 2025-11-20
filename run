@@ -329,8 +329,21 @@ function dev:clean:all {
   echo "✅ Deep clean complete"
 }
 
+function bumpversion {
+  #@ Bump version using bumpversion tool
+  #@ Usage: bumpversion [patch|minor|major] or bumpversion --new-version X.Y.Z patch
+  #@ Category: Development
+  command bumpversion "$@"
+}
+
+function version {
+  #@ Show current project version
+  #@ Category: Development
+  cat VERSION
+}
+
 function dev:version:bump {
-  #@ Bump version to specified version
+  #@ Bump version to specified version (deprecated - use bumpversion)
   #@ Usage: dev:version:bump <version>
   #@ Category: Development
   local new_version=$1
@@ -340,25 +353,24 @@ function dev:version:bump {
     exit 1
   fi
 
+  echo "⚠️  Warning: dev:version:bump is deprecated. Use 'bumpversion --new-version $new_version patch' instead"
   echo "Bumping version to $new_version..."
-  # Portable sed in-place replacement (works on GNU and BSD)
-  sed "s/^version = \".*\"/version = \"$new_version\"/" Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
-
-  echo "✅ Version bumped to $new_version in Cargo.toml"
+  command bumpversion --new-version "$new_version" patch
+  echo "✅ Version bumped to $new_version"
   echo "Run 'cargo update' to update Cargo.lock"
 }
 
 function dev:version:show {
-  #@ Show current version
+  #@ Show current version (deprecated - use version)
   #@ Category: Development
-  grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2
+  cat VERSION
 }
 
 ################################################################################
 # Release/Version Commands
 
 function release:version {
-  #@ Get current version
+  #@ Get current version (deprecated - use version)
   #@ Category: Release/Version
   dev:version:show
 }
