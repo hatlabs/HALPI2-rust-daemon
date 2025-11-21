@@ -1,0 +1,13 @@
+name: Release Published
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    uses: hatlabs/shared-workflows/.github/workflows/publish-stable.yml@main
+    with:
+      apt-component: hatlabs
+    secrets:
+      APT_REPO_PAT: ${{ secrets.APT_REPO_PAT }}
