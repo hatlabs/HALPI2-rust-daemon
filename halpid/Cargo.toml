@@ -39,6 +39,10 @@ name = "halpid"
 path = "src/main.rs"
 
 [package.metadata.deb]
+name = "halpi2-rust-daemon"
+conflicts = "halpid"
+replaces = "halpid"
+provides = "halpid"
 maintainer = "Hat Labs Ltd. <info@hatlabs.fi>"
 copyright = "2025, Hat Labs Ltd."
 license-file = ["../LICENSE", "0"]
