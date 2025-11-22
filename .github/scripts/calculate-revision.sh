@@ -1,18 +1,16 @@
 #!/bin/bash
-set -euo pipefail
-
 # Calculate the next revision number for a given upstream version
-# Usage: calculate-revision.sh <upstream-version>
-# Example: calculate-revision.sh 5.0.0
-#
 # Finds all git tags matching v<upstream-version>+<N> or v<upstream-version>+<N>_pre
-# Returns the next N value (highest N + 1)
-# Returns 1 if no matching tags exist
+# Returns the next N value (highest N + 1), or 1 if no matching tags exist
+#
+# Usage: calculate-revision.sh <upstream-version>
+
+set -euo pipefail
 
 UPSTREAM_VERSION="${1:-}"
 
 if [ -z "$UPSTREAM_VERSION" ]; then
-    echo "Error: upstream version required" >&2
+    echo "Error: Upstream version is required" >&2
     echo "Usage: $0 <upstream-version>" >&2
     exit 1
 fi
@@ -21,10 +19,7 @@ fi
 UPSTREAM_VERSION="${UPSTREAM_VERSION#v}"
 
 # Find all tags matching the pattern: v{version}+{N} or v{version}+{N}_pre
-# Pattern: v5.0.0+1, v5.0.0+1_pre, v5.0.0+2, etc.
 PATTERN="v${UPSTREAM_VERSION}+*"
-
-# Get all matching tags
 MATCHING_TAGS=$(git tag -l "$PATTERN" 2>/dev/null || true)
 
 if [ -z "$MATCHING_TAGS" ]; then
@@ -33,12 +28,10 @@ if [ -z "$MATCHING_TAGS" ]; then
     exit 0
 fi
 
-# Extract revision numbers from tags
-# Example: v5.0.0+2_pre -> 2, v5.0.0+3 -> 3
+# Extract revision numbers from tags and find max
 MAX_REVISION=0
 while IFS= read -r tag; do
     # Extract the number between '+' and either end of string or '_'
-    # Pattern: v5.0.0+N or v5.0.0+N_pre
     if [[ $tag =~ \+([0-9]+)(_.*)?$ ]]; then
         REVISION="${BASH_REMATCH[1]}"
         if [ "$REVISION" -gt "$MAX_REVISION" ]; then
