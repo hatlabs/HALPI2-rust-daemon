@@ -10,6 +10,7 @@ jobs:
     with:
       package-name: halpi2-rust-daemon
       package-description: 'HALPI2 hardware daemon (Rust implementation)'
+      apt-distro: any
       apt-component: hatlabs
     secrets:
       APT_REPO_PAT: ${{ secrets.APT_REPO_PAT }}
