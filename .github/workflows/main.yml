@@ -83,22 +83,21 @@ jobs:
       - name: Rename package with distro+component suffix
         if: steps.check.outputs.action == 'create'
         run: |
-          UPSTREAM="${{ steps.version.outputs.upstream }}"
-          # cargo-deb uses the upstream version directly
-          OLD_NAME="halpid_${UPSTREAM}_arm64.deb"
-          NEW_NAME="halpid_${UPSTREAM}_arm64+${APT_DISTRO}+${APT_COMPONENT}.deb"
+          # Find the .deb file (package name comes from cargo-deb metadata)
+          OLD_NAME=$(ls *.deb 2>/dev/null | head -1)
 
-          if [ -f "$OLD_NAME" ]; then
-            echo "📦 Renaming package: $(basename $OLD_NAME) → $(basename $NEW_NAME)"
-            mv "$OLD_NAME" "$NEW_NAME"
-            echo "✅ Package renamed successfully"
-            echo "Package location: $NEW_NAME"
-          else
-            echo "❌ Error: Expected package not found: $OLD_NAME"
-            echo "Available .deb files:"
-            ls -la *.deb 2>/dev/null || echo "No .deb files found"
+          if [ -z "$OLD_NAME" ]; then
+            echo "❌ Error: No .deb file found"
             exit 1
           fi
+
+          # Extract base name and add distro+component suffix
+          # e.g., halpi2-rust-daemon_5.0.0_arm64.deb -> halpi2-rust-daemon_5.0.0_arm64+trixie+hatlabs.deb
+          NEW_NAME="${OLD_NAME%.deb}+${APT_DISTRO}+${APT_COMPONENT}.deb"
+
+          echo "📦 Renaming package: $OLD_NAME → $NEW_NAME"
+          mv "$OLD_NAME" "$NEW_NAME"
+          echo "✅ Package renamed successfully"
 
       - name: Generate pre-release notes
         if: steps.check.outputs.action == 'create'
