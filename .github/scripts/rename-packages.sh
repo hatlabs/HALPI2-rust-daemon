@@ -41,7 +41,14 @@ fi
 PACKAGE_NAME="halpi2-rust-daemon"
 ARCH="arm64"
 
-OLD_NAME="${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
+# cargo-deb uses the upstream version from Cargo.toml, not the full Debian version
+# Debian version format: <upstream>-<revision> (e.g., 5.0.0-2)
+# cargo-deb produces: <upstream> (e.g., 5.0.0)
+UPSTREAM_VERSION="${VERSION%-*}"  # Strip -N revision suffix
+
+# cargo-deb produced package (uses upstream version only)
+OLD_NAME="${PACKAGE_NAME}_${UPSTREAM_VERSION}_${ARCH}.deb"
+# Final package name (uses full Debian version with revision)
 NEW_NAME="${PACKAGE_NAME}_${VERSION}_${ARCH}+${DISTRO}+${COMPONENT}.deb"
 
 if [ -f "$OLD_NAME" ]; then
