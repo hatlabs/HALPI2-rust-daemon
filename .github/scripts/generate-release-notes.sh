@@ -56,7 +56,7 @@ echo "deb [signed-by=/usr/share/keyrings/hatlabs-apt-key.gpg] https://apt.hatlab
 
 # Update and install
 sudo apt update
-sudo apt install halpi2-daemon
+sudo apt install halpi2-rust-daemon
 \`\`\`
 
 EOF
@@ -87,7 +87,7 @@ ${CHANGELOG}
 This is the source code release. For Debian packages:
 
 \`\`\`bash
-sudo apt install halpi2-daemon
+sudo apt install halpi2-rust-daemon
 \`\`\`
 
 See [apt.hatlabs.fi](https://github.com/hatlabs/apt.hatlabs.fi) for repository setup.
@@ -125,7 +125,7 @@ ${CHANGELOG}
 This is the source code release. For Debian packages:
 
 \`\`\`bash
-sudo apt install halpi2-daemon
+sudo apt install halpi2-rust-daemon
 \`\`\`
 
 See [apt.hatlabs.fi](https://github.com/hatlabs/apt.hatlabs.fi) for repository setup.
