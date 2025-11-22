@@ -37,9 +37,9 @@ if [ -z "$VERSION" ] || [ -z "$DISTRO" ] || [ -z "$COMPONENT" ]; then
     exit 1
 fi
 
-# Package name and architecture
+# Package name and architecture (ARM64 for Raspberry Pi)
 PACKAGE_NAME="halpi2-rust-daemon"
-ARCH="amd64"
+ARCH="arm64"
 
 OLD_NAME="${PACKAGE_NAME}_${VERSION}_${ARCH}.deb"
 NEW_NAME="${PACKAGE_NAME}_${VERSION}_${ARCH}+${DISTRO}+${COMPONENT}.deb"
