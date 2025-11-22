@@ -29,8 +29,8 @@ runs:
         # Build the halpi CLI tool as well (referenced in Cargo.toml assets)
         cargo build --release --target aarch64-unknown-linux-musl -p halpi
 
-        # Build the .deb package
-        cargo deb -p halpid --target aarch64-unknown-linux-musl --no-build
+        # Build the .deb package (--no-strip because host strip can't handle ARM64 binaries)
+        cargo deb -p halpid --target aarch64-unknown-linux-musl --no-build --no-strip
       shell: bash
 
     - name: Move package to root
