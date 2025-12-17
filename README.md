@@ -349,6 +349,29 @@ cargo clippy --all-targets -- -D warnings
 cargo doc --no-deps --open
 ```
 
+### Pre-commit Hooks
+
+This project uses [lefthook](https://github.com/evilmartians/lefthook) for pre-commit hooks to run format and lint checks locally before commits.
+
+```bash
+# Install lefthook (one-time)
+brew install lefthook
+
+# Enable hooks in this repo
+./run hooks-install
+```
+
+**What it checks:**
+
+- `cargo fmt --all -- --check` - Code formatting
+- `cargo clippy --all-targets -- -D warnings` - Linting
+
+**Skip hooks when needed:**
+
+```bash
+git commit --no-verify -m "WIP: message"
+```
+
 ## Migrating from Python halpid 4.x
 
 The Rust daemon is 100% API compatible with Python `halpid` 4.x. Migration is straightforward:

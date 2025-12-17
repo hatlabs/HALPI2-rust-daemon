@@ -1,0 +1,12 @@
+pre-commit:
+  parallel: true
+  commands:
+    rust-fmt-check:
+      glob: "*.rs"
+      run: cargo fmt --all -- --check
+      fail_text: "Run 'cargo fmt --all' to fix formatting."
+
+    rust-clippy:
+      glob: "*.rs"
+      run: cargo clippy --all-targets -- -D warnings
+      fail_text: "Fix clippy warnings before committing."
