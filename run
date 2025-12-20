@@ -129,30 +129,6 @@ _detect_docker_platform() {
   esac
 }
 
-function docker-build {
-  #@ Build in Docker container (automatic Linux environment)
-  #@ Usage: docker-build [--release]
-  #@ Category: Docker Build
-  local build_args="$@"
-
-  echo "🏗️  Building in Docker container..."
-
-  # Detect host architecture for platform selection
-  IFS=':' read -r platform _ <<< "$(_detect_docker_platform)"
-
-  docker run --rm \
-    --platform "$platform" \
-    -v "$(pwd):/workspace" \
-    -w /workspace \
-    mcr.microsoft.com/devcontainers/rust:1-bookworm \
-    bash -c "
-      set -e
-      echo '🔨 Running cargo build $build_args...'
-      cargo build $build_args
-      echo '✅ Build complete!'
-    " && echo "✅ Build successful in Docker container"
-}
-
 function docker-cross-build {
   #@ Cross-compile for ARM64 Linux using cross in Docker
   #@ Usage: docker-cross-build [--release]
