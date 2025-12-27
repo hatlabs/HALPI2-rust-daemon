@@ -10,3 +10,7 @@ pre-commit:
       glob: "*.rs"
       run: cargo clippy --all-targets -- -D warnings
       fail_text: "Fix clippy warnings before committing."
+
+    check-hostnames:
+      run: .github/scripts/check-hardcoded-hostnames.sh
+      fail_text: "Hard-coded hostname references found. See error above for details."
