@@ -39,24 +39,24 @@ name = "halpid"
 path = "src/main.rs"
 
 [package.metadata.deb]
-name = "halpi2-rust-daemon"
-conflicts = "halpid"
-replaces = "halpid"
-provides = "halpid"
+name = "halpid"
+conflicts = "halpi2-rust-daemon"
+replaces = "halpi2-rust-daemon"
+provides = "halpi2-rust-daemon"
 maintainer = "Hat Labs Ltd. <info@hatlabs.fi>"
 copyright = "2025, Hat Labs Ltd."
 license-file = ["../LICENSE", "0"]
 extended-description = """\
-HALPI2 power monitoring and watchdog daemon (Rust implementation).
+HALPI2 power monitoring and watchdog daemon.
 Provides power management, blackout detection, and hardware watchdog
 functionality for HALPI2 Raspberry Pi CM4/CM5 carrier boards."""
-depends = "$auto"
 section = "admin"
 priority = "optional"
 assets = [
     ["target/release/halpid", "usr/bin/", "755"],
     ["target/release/halpi", "usr/bin/", "755"],
     ["../config/halpid.conf", "etc/halpid/halpid.conf", "644"],
+    ["debian/lintian-overrides", "usr/share/lintian/overrides/halpid", "644"],
 ]
 conf-files = [
     "/etc/halpid/halpid.conf",

@@ -3,13 +3,16 @@ members = ["halpid", "halpi", "halpi-common"]
 resolver = "2"
 
 [workspace.package]
-version = "5.0.0"
+version = "5.0.1"
 authors = ["Matti Airas <matti.airas@hatlabs.fi>"]
 edition = "2024"
 rust-version = "1.90"
 license = "BSD-3-Clause"
 repository = "https://github.com/hatlabs/HALPI2-rust-daemon"
 homepage = "https://docs.hatlabs.fi/halpi2"
+
+[profile.release]
+strip = true
 
 [workspace.dependencies]
 # Async runtime

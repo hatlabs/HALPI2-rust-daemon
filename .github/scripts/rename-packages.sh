@@ -38,7 +38,7 @@ if [ -z "$VERSION" ] || [ -z "$DISTRO" ] || [ -z "$COMPONENT" ]; then
 fi
 
 # Package name and architecture (ARM64 for Raspberry Pi)
-PACKAGE_NAME="halpi2-rust-daemon"
+PACKAGE_NAME="halpid"
 ARCH="arm64"
 
 # cargo-deb now receives the correct Debian version via --deb-version

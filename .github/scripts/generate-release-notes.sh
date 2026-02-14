@@ -31,7 +31,7 @@ fi
 case "$RELEASE_TYPE" in
   prerelease)
     cat > release_notes.md <<EOF
-## HALPI2 Rust Daemon v${TAG_VERSION} (Pre-release)
+## halpid v${TAG_VERSION} (Pre-release)
 
 ⚠️ **This is a pre-release build from the main branch. Use for testing only.**
 
@@ -56,7 +56,7 @@ echo "deb [signed-by=/usr/share/keyrings/hatlabs-apt-key.gpg] https://apt.hatlab
 
 # Update and install
 sudo apt update
-sudo apt install halpi2-rust-daemon
+sudo apt install halpid
 \`\`\`
 
 EOF
@@ -64,9 +64,9 @@ EOF
 
   draft)
     cat > release_notes.md <<EOF
-## HALPI2 Rust Daemon v${VERSION}
+## halpid v${VERSION}
 
-High-performance Rust reimplementation of the HALPI2 power monitor and watchdog daemon.
+HALPI2 power monitoring and watchdog daemon.
 
 ### Changes
 
@@ -87,7 +87,7 @@ ${CHANGELOG}
 This is the source code release. For Debian packages:
 
 \`\`\`bash
-sudo apt install halpi2-rust-daemon
+sudo apt install halpid
 \`\`\`
 
 See [apt.hatlabs.fi](https://github.com/hatlabs/apt.hatlabs.fi) for repository setup.
@@ -102,9 +102,9 @@ EOF
 
   stable)
     cat > release_notes.md <<EOF
-## HALPI2 Rust Daemon v${VERSION}
+## halpid v${VERSION}
 
-High-performance Rust reimplementation of the HALPI2 power monitor and watchdog daemon.
+HALPI2 power monitoring and watchdog daemon.
 
 ### Changes
 
@@ -125,7 +125,7 @@ ${CHANGELOG}
 This is the source code release. For Debian packages:
 
 \`\`\`bash
-sudo apt install halpi2-rust-daemon
+sudo apt install halpid
 \`\`\`
 
 See [apt.hatlabs.fi](https://github.com/hatlabs/apt.hatlabs.fi) for repository setup.

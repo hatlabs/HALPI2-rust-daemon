@@ -13,8 +13,8 @@ jobs:
   build-release:
     uses: hatlabs/shared-workflows/.github/workflows/build-release.yml@main
     with:
-      package-name: halpi2-rust-daemon
-      package-description: 'HALPI2 hardware daemon (Rust implementation)'
+      package-name: halpid
+      package-description: 'HALPI2 power monitoring and watchdog daemon'
       apt-distro: any
       apt-component: hatlabs
     secrets:
