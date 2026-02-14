@@ -1,0 +1,20 @@
+# Statically linked musl binaries are intentional for zero-dependency deployment
+halpid: statically-linked-binary [usr/bin/halpi]
+halpid: statically-linked-binary [usr/bin/halpid]
+
+# Static binary embeds libyaml (unsafe-libyaml crate) by design
+halpid: embedded-library libyaml [usr/bin/halpid]
+
+# cargo-deb does not generate Debian changelogs
+halpid: no-changelog *
+
+# Static musl binary has no dynamic dependencies
+halpid: empty-field Depends
+
+# HALPI2 only runs on systemd-based systems (Raspberry Pi OS / HaLOS)
+halpid: maintainer-script-calls-systemctl [postinst:*]
+halpid: maintainer-script-calls-systemctl [prerm:*]
+
+# Man pages not yet provided
+halpid: no-manual-page [usr/bin/halpi]
+halpid: no-manual-page [usr/bin/halpid]

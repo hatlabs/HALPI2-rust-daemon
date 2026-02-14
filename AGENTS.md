@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HALPI2 Rust Daemon is a reimplementation of the HALPI2 power monitor and watchdog daemon in Rust for improved performance, reliability, and resource utilization. It maintains 100% API compatibility with the Python `halpid` version 4.x.
+HALPI2 Rust Daemon (`halpid`) is the power monitor and watchdog daemon for HALPI2, written in Rust. It is 100% API-compatible with the legacy Python `halpid` version 4.x.
 
 ## Development Environment
 
@@ -19,7 +19,7 @@ Open the project in VSCode and select "Reopen in Container". This provides:
 ### Option 2: Cross-Compilation (Limited)
 Cross-compilation from macOS works for building but NOT for testing:
 ```bash
-./run build:cross --release  # Compiles for ARM64 Linux
+./run cross-build --release  # Compiles for ARM64 Linux
 ```
 Note: Tests cannot run via cross-compilation - use dev container instead.
 
@@ -32,52 +32,57 @@ Use the `./run` script for all development tasks:
 
 ### Core Development
 - `./run build [--release]` - Build all workspace members
-- `./run build:daemon [--release]` - Build halpid daemon only
-- `./run build:cli [--release]` - Build halpi CLI only
+- `./run build-daemon [--release]` - Build halpid daemon only
+- `./run build-cli [--release]` - Build halpi CLI only
 - `./run clean` - Clean all build artifacts
 - `./run check` - Run cargo check and clippy
-- `./run fmt` - Format code with rustfmt
-- `./run fmt:check` - Check code formatting
+- `./run format` - Format code with rustfmt
+- `./run check-format` - Check code formatting
 
 ### Cross-Compilation
-- `./run build:cross [--release]` - Build for ARM64 Linux (aarch64-unknown-linux-musl)
-- `./run cross:setup` - Install cross-compilation tools
+- `./run cross-build [--release]` - Build for ARM64 Linux (aarch64-unknown-linux-musl)
+- `./run setup-cross` - Install cross-compilation tools
 
 ### Testing
 - `./run test` - Run all tests
-- `./run test:unit` - Run unit tests only
-- `./run test:integration` - Run integration tests only
-- `./run test:coverage` - Run tests with coverage report
+- `./run test-unit` - Run unit tests only
+- `./run test-integration` - Run integration tests only
+- `./run test-coverage` - Run tests with coverage report
 
 ### Package Management
-- `./run package:deb` - Build Debian package (native)
-- `./run package:deb:cross` - Build Debian package for ARM64
+- `./run build-deb` - Build Debian package (native)
+- `./run cross-build-deb` - Build Debian package for ARM64
+
+### Docker Build (for macOS/non-Linux development)
+- `./run docker-build [--release]` - Build in Docker container
+- `./run docker-cross-build [--release]` - Cross-compile for ARM64 Linux in Docker
+- `./run docker-build-deb` - Build Debian package for ARM64 in Docker
 
 ### Development Utilities
-- `./run dev:daemon` - Run daemon in development mode
-- `./run dev:clean:all` - Deep clean (cargo + artifacts + packages)
-- `./run dev:version:bump <version>` - Bump version to specified version
-- `./run dev:version:show` - Show current version
+- `./run run-daemon` - Run daemon in development mode
+- `./run clean-all` - Deep clean (cargo + artifacts + packages)
+- `./run bumpversion <version>` - Bump version to specified version
+- `./run version` - Show current version
 
 ### CI/CD
-- `./run ci:check` - Run CI verification checks
-- `./run ci:build` - Full CI build pipeline
+- `./run ci-check` - Run CI verification checks
+- `./run ci-build` - Full CI build pipeline
 
 ### Common Workflows
 ```bash
 # Development cycle
-./run build && ./run dev:daemon
+./run build && ./run run-daemon
 
 # Full check before commit
-./run ci:check
+./run ci-check
 
 # Build release for Raspberry Pi
-./run build:cross --release
-./run package:deb:cross
+./run cross-build --release
+./run cross-build-deb
 
 # Version management
-./run dev:version:show
-./run dev:version:bump 5.1.0
+./run version
+./run bumpversion 5.1.0
 ```
 
 ## Pre-Commit Checklist for Claude Code
@@ -217,7 +222,7 @@ When implementing features, always verify compatibility with the Python version:
 **Important**: This daemon is Linux-only. It cannot be built natively on macOS or other platforms due to I2C hardware dependencies (the `i2cdev` crate requires Linux).
 
 **Development Workflow**:
-- **On macOS**: Use `./run build:cross` which compiles FOR Linux (target_os = "linux"), so all Linux-specific code is active
+- **On macOS**: Use `./run cross-build` which compiles FOR Linux (target_os = "linux"), so all Linux-specific code is active
 - **Testing on macOS**: Run tests in Docker container (Linux environment)
 - **On Linux**: Native builds work fine with `./run build`
 
