@@ -3,7 +3,7 @@ members = ["halpid", "halpi", "halpi-common"]
 resolver = "2"
 
 [workspace.package]
-version = "5.0.1"
+version = "5.0.2"
 authors = ["Matti Airas <matti.airas@hatlabs.fi>"]
 edition = "2024"
 rust-version = "1.90"
