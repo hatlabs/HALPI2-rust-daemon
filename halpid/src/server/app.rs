@@ -59,7 +59,7 @@ pub async fn run_server(state: AppState) -> anyhow::Result<()> {
     let listener = UnixListener::bind(&socket_path)?;
 
     // Set socket permissions and group ownership
-    setup_socket_permissions(&socket_path, "adm").await?;
+    setup_socket_permissions(&socket_path, "halpid").await?;
 
     tracing::info!("HTTP server listening on {}", socket_path.display());
 

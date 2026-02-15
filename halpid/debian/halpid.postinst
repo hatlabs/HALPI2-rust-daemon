@@ -12,9 +12,15 @@ case "$1" in
             chmod 755 /run/halpid
         fi
 
-        # Ensure the adm group exists (for socket access)
-        if ! getent group adm > /dev/null 2>&1; then
-            addgroup --system adm
+        # Create the halpid system group with fixed GID 960 (for socket access)
+        if ! getent group halpid > /dev/null 2>&1; then
+            addgroup --system --gid 960 halpid
+        fi
+
+        # Add the default user (UID 1000) to the halpid group for CLI access
+        DEFAULT_USER=$(getent passwd 1000 | cut -d: -f1)
+        if [ -n "$DEFAULT_USER" ]; then
+            adduser "$DEFAULT_USER" halpid || true
         fi
 
         # Reload systemd daemon to recognize new service
