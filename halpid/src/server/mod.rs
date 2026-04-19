@@ -5,5 +5,6 @@
 
 pub mod app;
 pub mod handlers;
+pub mod led_socket;
 
 pub use app::{AppState, create_app};

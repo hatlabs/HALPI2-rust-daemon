@@ -63,6 +63,7 @@ pub async fn get_all_values(State(state): State<AppState>) -> Response {
         "watchdog_enabled": watchdog_enabled,
         "watchdog_timeout": watchdog_timeout as f64 / 1000.0, // Convert ms to seconds
         "watchdog_elapsed": measurements.watchdog_elapsed,
+        "num_leds": state.num_leds,
     });
 
     (StatusCode::OK, Json(response_json)).into_response()
@@ -90,10 +91,15 @@ fn requires_device_access(key: &str) -> bool {
 
 /// GET /values/:key - Get a specific value by key
 pub async fn get_value(State(state): State<AppState>, Path(key): Path<String>) -> Response {
-    // Handle daemon_version without device access
-    if key == "daemon_version" {
-        let value = json!(state.version);
-        return (StatusCode::OK, Json(value)).into_response();
+    // Handle keys that don't require device access
+    match key.as_str() {
+        "daemon_version" => {
+            return (StatusCode::OK, Json(json!(state.version))).into_response();
+        }
+        "num_leds" => {
+            return (StatusCode::OK, Json(json!(state.num_leds))).into_response();
+        }
+        _ => {}
     }
 
     // Check if key is valid and requires device access
@@ -183,7 +189,7 @@ mod tests {
             Err(_) => return,
         };
         let config = Arc::new(RwLock::new(Config::default()));
-        let state = AppState::new(device, config);
+        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS);
 
         let response = get_all_values(State(state)).await;
         // Response will be 500 if no I2C device, but should be a valid response structure
@@ -201,7 +207,7 @@ mod tests {
             Err(_) => return,
         };
         let config = Arc::new(RwLock::new(Config::default()));
-        let state = AppState::new(device, config);
+        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS);
 
         let response = get_value(State(state), Path("invalid_key".to_string())).await;
         assert_eq!(response.status(), StatusCode::NOT_FOUND);

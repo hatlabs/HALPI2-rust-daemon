@@ -20,15 +20,22 @@ pub struct AppState {
     pub config: Arc<RwLock<Config>>,
     /// Daemon version string
     pub version: &'static str,
+    /// Number of LEDs on this hardware (derived from hardware version at startup)
+    pub num_leds: usize,
 }
 
 impl AppState {
     /// Create new application state
-    pub fn new(device: Arc<Mutex<HalpiDevice>>, config: Arc<RwLock<Config>>) -> Self {
+    pub fn new(
+        device: Arc<Mutex<HalpiDevice>>,
+        config: Arc<RwLock<Config>>,
+        num_leds: usize,
+    ) -> Self {
         Self {
             device,
             config,
             version: env!("CARGO_PKG_VERSION"),
+            num_leds,
         }
     }
 }
@@ -196,7 +203,7 @@ mod tests {
             Err(_) => return,
         };
         let config = Arc::new(RwLock::new(Config::default()));
-        let state = AppState::new(device, config);
+        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS);
 
         assert_eq!(state.version, env!("CARGO_PKG_VERSION"));
     }
@@ -209,7 +216,7 @@ mod tests {
             Err(_) => return,
         };
         let config = Arc::new(RwLock::new(Config::default()));
-        let state = AppState::new(device, config);
+        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS);
 
         let _app = create_app(state);
         // If this compiles and runs, the router is created successfully
