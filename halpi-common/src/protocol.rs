@@ -503,4 +503,19 @@ mod tests {
         // Should match original (within tolerance)
         assert!((decoded_celsius - temp_celsius).abs() < 0.5);
     }
+
+    #[test]
+    fn test_num_leds_for_hardware_version() {
+        use crate::types::Version;
+
+        // All current hardware versions return DEFAULT_NUM_LEDS
+        let v0 = Version::from_bytes([0, 0, 0, 0]);
+        assert_eq!(num_leds_for_hardware_version(&v0), DEFAULT_NUM_LEDS);
+
+        let v1 = Version::from_bytes([1, 0, 0, 255]);
+        assert_eq!(num_leds_for_hardware_version(&v1), DEFAULT_NUM_LEDS);
+
+        let v2 = Version::from_bytes([2, 1, 0, 255]);
+        assert_eq!(num_leds_for_hardware_version(&v2), DEFAULT_NUM_LEDS);
+    }
 }

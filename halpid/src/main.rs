@@ -160,9 +160,12 @@ async fn main() {
     let led_socket_handle = {
         let device = device.clone();
         let led_path = led_socket_path.clone();
+        let led_group = config.socket_group.clone();
         tokio::spawn(async move {
             info!("Starting LED socket");
-            if let Err(e) = server::led_socket::run_led_socket(device, num_leds, led_path).await {
+            if let Err(e) =
+                server::led_socket::run_led_socket(device, num_leds, led_path, led_group).await
+            {
                 error!("LED socket error: {}", e);
             }
         })

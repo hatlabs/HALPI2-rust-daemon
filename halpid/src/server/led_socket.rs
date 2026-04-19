@@ -11,14 +11,35 @@
 //! Connection locking: first connected client prevails. New connections are
 //! immediately closed while a client is active.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::AsyncReadExt;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
+use super::app::setup_socket_permissions;
 use crate::i2c::device::HalpiDevice;
+
+/// Guard that releases the active_client flag on drop, even if the task panics.
+struct ActiveClientGuard {
+    flag: Arc<Mutex<bool>>,
+}
+
+impl Drop for ActiveClientGuard {
+    fn drop(&mut self) {
+        // Use try_lock to avoid blocking in drop. If lock is contended,
+        // spawn a task to release it asynchronously.
+        if let Ok(mut active) = self.flag.try_lock() {
+            *active = false;
+        } else {
+            let flag = self.flag.clone();
+            tokio::spawn(async move {
+                *flag.lock().await = false;
+            });
+        }
+    }
+}
 
 /// Run the LED socket server
 ///
@@ -29,6 +50,7 @@ pub async fn run_led_socket(
     device: Arc<Mutex<HalpiDevice>>,
     num_leds: usize,
     socket_path: PathBuf,
+    socket_group: String,
 ) -> anyhow::Result<()> {
     // Remove existing socket if it exists
     if socket_path.exists() {
@@ -42,8 +64,8 @@ pub async fn run_led_socket(
 
     let listener = UnixListener::bind(&socket_path)?;
 
-    // Set socket permissions
-    setup_led_socket_permissions(&socket_path, "halpid")?;
+    // Reuse shared socket permission setup from app.rs
+    setup_socket_permissions(&socket_path, &socket_group).await?;
 
     info!("LED socket listening on {}", socket_path.display());
 
@@ -57,7 +79,6 @@ pub async fn run_led_socket(
         {
             let mut active = active_client.lock().await;
             if *active {
-                // Reject: another client is connected
                 drop(stream);
                 continue;
             }
@@ -68,13 +89,16 @@ pub async fn run_led_socket(
         let active_client = active_client.clone();
 
         tokio::spawn(async move {
+            // Guard ensures flag is released even on panic
+            let _guard = ActiveClientGuard {
+                flag: active_client,
+            };
+
             if let Err(e) = handle_led_client(stream, device, expected_payload_len).await {
                 warn!("LED client disconnected: {}", e);
             } else {
                 info!("LED client disconnected");
             }
-            // Release the lock
-            *active_client.lock().await = false;
         });
     }
 }
@@ -94,11 +118,11 @@ async fn handle_led_client(
         let length = stream.read_u8().await?;
 
         if length as usize != expected_len {
-            warn!(
-                "LED socket: invalid length {}, expected {}. Closing connection.",
-                length, expected_len
-            );
-            return Ok(());
+            return Err(anyhow::anyhow!(
+                "invalid LED payload length: {} (expected {})",
+                length,
+                expected_len
+            ));
         }
 
         // Read payload
@@ -110,28 +134,4 @@ async fn handle_led_client(
             error!("LED override I2C write failed: {}", e);
         }
     }
-}
-
-/// Set socket permissions (matching HTTP socket pattern)
-fn setup_led_socket_permissions(socket_path: &Path, group_name: &str) -> anyhow::Result<()> {
-    use std::ffi::CString;
-    use std::os::unix::fs::PermissionsExt;
-
-    // Set permissions to 0660
-    let permissions = std::fs::Permissions::from_mode(0o660);
-    std::fs::set_permissions(socket_path, permissions)?;
-
-    // Set group ownership
-    let group_name_c = CString::new(group_name)?;
-    let grp = unsafe { libc::getgrnam(group_name_c.as_ptr()) };
-    if !grp.is_null() {
-        let gid = unsafe { (*grp).gr_gid };
-        let uid = unsafe { libc::getuid() };
-        let path_c = CString::new(socket_path.to_str().unwrap_or(""))?;
-        unsafe {
-            libc::chown(path_c.as_ptr(), uid, gid);
-        }
-    }
-
-    Ok(())
 }
