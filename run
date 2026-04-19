@@ -306,10 +306,15 @@ function clean-all {
 }
 
 function bumpversion {
-  #@ Bump version using bumpversion tool
-  #@ Usage: bumpversion [patch|minor|major] or bumpversion --new-version X.Y.Z patch
+  #@ Bump version to a specific version number
+  #@ Usage: bumpversion <version>  (e.g. bumpversion 5.1.0)
   #@ Category: Development Utilities
-  command bumpversion "$@"
+  local version="$1"
+  if [[ -z "$version" ]]; then
+    echo "Usage: bumpversion <version>" >&2
+    return 1
+  fi
+  command bumpversion --new-version "$version" patch
 }
 
 function version {
