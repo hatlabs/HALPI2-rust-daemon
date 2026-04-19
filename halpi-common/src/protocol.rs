@@ -68,6 +68,20 @@ pub const REG_PCB_TEMPERATURE: u8 = 0x24;
 /// Device unique ID (8 bytes)
 pub const REG_DEVICE_ID: u8 = 0x25;
 
+/// LED override (write NUM_LEDS * 6 bytes: R,G,B,Alpha,TransitionMs_BE per LED)
+/// Only processed in OperationalCoOp state. Alpha=0 means no override.
+/// Overrides auto-clear after 5 seconds without updates.
+pub const REG_LED_OVERRIDE: u8 = 0x60;
+
+/// Default number of LEDs (for hardware versions that don't specify)
+pub const DEFAULT_NUM_LEDS: usize = 5;
+
+/// Derive number of LEDs from hardware version
+pub fn num_leds_for_hardware_version(_hw_version: &crate::types::Version) -> usize {
+    // All current hardware versions have 5 LEDs
+    DEFAULT_NUM_LEDS
+}
+
 /// Request shutdown command (write byte)
 pub const REG_REQUEST_SHUTDOWN: u8 = 0x30;
 

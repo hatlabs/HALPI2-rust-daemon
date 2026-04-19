@@ -120,16 +120,31 @@ async fn main() {
         }
     };
 
+    // Derive LED count from hardware version
+    let num_leds = {
+        let mut dev = device.lock().await;
+        let hw_version = dev
+            .get_hardware_version()
+            .unwrap_or_else(|_| halpi_common::types::Version::from_bytes([0, 0, 0, 0]));
+        let n = halpi_common::protocol::num_leds_for_hardware_version(&hw_version);
+        info!("Hardware version: {}, LED count: {}", hw_version, n);
+        n
+    };
+
     let config_arc = Arc::new(RwLock::new(config.clone()));
 
     // Create shared state for HTTP server
-    let app_state = AppState::new(device.clone(), config_arc.clone());
+    let app_state = AppState::new(device.clone(), config_arc.clone(), num_leds);
 
-    // Get socket path for cleanup
+    // Get socket paths for cleanup
     let socket_path = config
         .socket
         .clone()
         .unwrap_or_else(|| PathBuf::from("/run/halpid/halpid.sock"));
+    let led_socket_path = config
+        .led_socket
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("/run/halpid/led.sock"));
 
     // Spawn concurrent tasks
     let server_handle = {
@@ -138,6 +153,17 @@ async fn main() {
             info!("Starting HTTP server");
             if let Err(e) = server::app::run_server(app_state).await {
                 error!("Server error: {}", e);
+            }
+        })
+    };
+
+    let led_socket_handle = {
+        let device = device.clone();
+        let led_path = led_socket_path.clone();
+        tokio::spawn(async move {
+            info!("Starting LED socket");
+            if let Err(e) = server::led_socket::run_led_socket(device, num_leds, led_path).await {
+                error!("LED socket error: {}", e);
             }
         })
     };
@@ -161,6 +187,9 @@ async fn main() {
         _ = server_handle => {
             info!("Server task completed");
         }
+        _ = led_socket_handle => {
+            info!("LED socket task completed");
+        }
         _ = state_machine_handle => {
             info!("State machine task completed");
         }
@@ -171,6 +200,11 @@ async fn main() {
 
     // Run cleanup
     daemon::signals::cleanup(device, &socket_path).await;
+
+    // Clean up LED socket
+    if led_socket_path.exists() {
+        let _ = std::fs::remove_file(&led_socket_path);
+    }
 
     info!("Daemon shutdown complete");
 }

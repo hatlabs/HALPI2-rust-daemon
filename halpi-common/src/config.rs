@@ -72,6 +72,10 @@ pub struct Config {
     /// Command to execute for system poweroff
     #[serde(default = "default_poweroff_command")]
     pub poweroff: String,
+
+    /// Path to UNIX socket for LED override control
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub led_socket: Option<PathBuf>,
 }
 
 // Default value functions for serde
@@ -109,6 +113,7 @@ impl Default for Config {
             socket: None,
             socket_group: DEFAULT_SOCKET_GROUP.to_string(),
             poweroff: DEFAULT_POWEROFF_COMMAND.to_string(),
+            led_socket: None,
         }
     }
 }
@@ -194,6 +199,10 @@ impl Config {
 
         if other.poweroff != DEFAULT_POWEROFF_COMMAND {
             self.poweroff = other.poweroff;
+        }
+
+        if other.led_socket.is_some() {
+            self.led_socket = other.led_socket;
         }
     }
 }

@@ -420,6 +420,13 @@ impl HalpiDevice {
         self.write_byte(protocol::REG_LED_BRIGHTNESS, brightness)
     }
 
+    /// Write LED override data to the firmware
+    ///
+    /// Data must be exactly `num_leds * 6` bytes: per LED [R, G, B, Alpha, TransitionMs_BE].
+    pub fn set_led_overrides(&mut self, data: &[u8]) -> Result<(), I2cError> {
+        self.write_bytes(protocol::REG_LED_OVERRIDE, data)
+    }
+
     /// Get auto-restart setting
     ///
     /// # Errors
