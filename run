@@ -323,6 +323,107 @@ function version {
   cat VERSION
 }
 
+function pre-pr {
+  #@ Run all pre-PR checks (format, lint, test, version bump)
+  #@ On macOS, only halpi-common is checked (halpid requires Linux I2C)
+  #@ Category: Development Utilities
+  local failed=0
+
+  echo "=== Formatting ==="
+  if ! cargo fmt --all -- --check; then
+    echo "❌ Formatting check failed. Run: cargo fmt --all"
+    failed=1
+  else
+    echo "✅ Formatting OK"
+  fi
+
+  echo ""
+  echo "=== Clippy ==="
+  if [[ "$(uname)" == "Darwin" ]]; then
+    echo "(macOS: checking halpi-common only — halpid requires Linux)"
+    if ! cargo clippy -p halpi-common --all-targets -- -D warnings; then
+      echo "❌ Clippy failed"
+      failed=1
+    else
+      echo "✅ Clippy OK (halpi-common)"
+    fi
+  else
+    if ! cargo clippy --all-targets -- -D warnings; then
+      echo "❌ Clippy failed"
+      failed=1
+    else
+      echo "✅ Clippy OK"
+    fi
+  fi
+
+  echo ""
+  echo "=== Tests ==="
+  if [[ "$(uname)" == "Darwin" ]]; then
+    echo "(macOS: testing halpi-common only — halpid requires Linux)"
+    if ! cargo test -p halpi-common --verbose; then
+      echo "❌ Tests failed"
+      failed=1
+    else
+      echo "✅ Tests OK (halpi-common)"
+    fi
+  else
+    if ! cargo test --verbose; then
+      echo "❌ Tests failed"
+      failed=1
+    else
+      echo "✅ Tests OK"
+    fi
+  fi
+
+  echo ""
+  echo "=== Version bump check ==="
+  local current_version
+  current_version=$(cat VERSION | tr -d '[:space:]')
+  local latest_tag
+  latest_tag=$(gh release list --exclude-drafts --exclude-pre-releases \
+    --json tagName --jq '.[].tagName' 2>/dev/null \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?\+[0-9]+$' \
+    | sort -V | tail -1 || true)
+
+  if [[ -n "$latest_tag" ]]; then
+    local tagged_version
+    tagged_version=$(echo "$latest_tag" | sed 's/^v\(.*\)+[0-9]*$/\1/')
+    if [[ "$current_version" == "$tagged_version" ]]; then
+      echo "❌ VERSION ($current_version) matches latest stable release ($latest_tag)."
+      echo "   Run: ./run bumpversion <new-version>"
+      failed=1
+    else
+      echo "✅ Version bumped: $current_version (latest release: $latest_tag)"
+    fi
+  else
+    echo "⚠️  No stable release tags found — skipping version check"
+  fi
+
+  echo ""
+  if [[ $failed -eq 1 ]]; then
+    echo "❌ Pre-PR checks failed. Fix issues above before creating PR."
+    return 1
+  else
+    echo "✅ All pre-PR checks passed. Ready to create PR with: ./run pr"
+  fi
+}
+
+function pr {
+  #@ Run pre-PR checks then create a pull request
+  #@ Usage: pr [--title "title"] [--body "body"]
+  #@ Category: Development Utilities
+  if ! pre-pr; then
+    echo ""
+    echo "Fix the issues above before creating a PR."
+    return 1
+  fi
+
+  echo ""
+  echo "=== Pushing and creating PR ==="
+  git push -u origin HEAD
+  gh pr create "$@"
+}
+
 function build-release {
   #@ Build release artifacts for ARM64
   #@ Category: Development Utilities
