@@ -58,10 +58,39 @@ function check-format {
 }
 
 ################################################################################
-# Cross-Compilation Commands
+# Docker Build Commands
+
+function docker-build {
+  #@ Build in Docker container (works on macOS and Linux)
+  #@ Usage: docker-build [--release]
+  #@ Category: Docker Build
+  docker compose -f docker/docker-compose.yml run --rm builder \
+    cargo build --target aarch64-unknown-linux-musl "$@"
+}
+
+function docker-build-deb {
+  #@ Build Debian package for ARM64 in Docker
+  #@ Category: Docker Build
+  echo "🏗️ Building ARM64 Debian package in Docker..."
+  docker compose -f docker/docker-compose.yml run --rm builder \
+    sh -c "cargo build --target aarch64-unknown-linux-musl --release && \
+           cargo deb -p halpid --target aarch64-unknown-linux-musl --no-build"
+
+  echo "✅ Debian package built:"
+  ls -la target/aarch64-unknown-linux-musl/debian/*.deb 2>/dev/null
+}
+
+function docker-shell {
+  #@ Open a shell in the Docker build container
+  #@ Category: Docker Build
+  docker compose -f docker/docker-compose.yml run --rm builder bash
+}
+
+################################################################################
+# Cross-Compilation Commands (legacy, may not work on Apple Silicon)
 
 function cross-build {
-  #@ Build for ARM64 Linux using cross
+  #@ Build for ARM64 Linux using cross (prefer docker-build on macOS)
   #@ Usage: cross-build [--release]
   #@ Category: Cross-Compilation
   if ! command -v cross &> /dev/null; then
@@ -69,7 +98,7 @@ function cross-build {
     exit 1
   fi
 
-  cross build --target aarch64-unknown-linux-musl $@
+  cross build --target aarch64-unknown-linux-musl "$@"
 }
 
 function setup-cross {
@@ -267,24 +296,6 @@ function build-deb {
 
   cargo deb -p halpid
   echo "✅ Debian package built successfully"
-}
-
-function cross-build-deb {
-  #@ Build Debian package for ARM64 using cross
-  #@ Category: Package Management
-  echo "🏗️ Building ARM64 Debian package..."
-
-  # First build release binary for ARM64
-  cross-build --release
-
-  # Then build package
-  if ! command -v cargo-deb &> /dev/null; then
-    echo "Installing cargo-deb..."
-    cargo install cargo-deb
-  fi
-
-  cargo deb -p halpid --target aarch64-unknown-linux-musl --no-build
-  echo "✅ ARM64 Debian package built successfully"
 }
 
 ################################################################################
