@@ -31,6 +31,7 @@ fn print_status_table(values: &HashMap<String, Value>) {
         &get_value_str(values, "firmware_version"),
         "",
     );
+    print_row("device_id", &get_value_str(values, "device_id"), "");
     println!();
 
     // State and outputs
@@ -93,9 +94,9 @@ fn print_status_table(values: &HashMap<String, Value>) {
 /// Print a formatted table row
 fn print_row(key: &str, value: &str, unit: &str) {
     if unit.is_empty() {
-        println!("{:<24} {:>15}", key, value);
+        println!("{:<24} {:>16}", key, value);
     } else {
-        println!("{:<24} {:>15} {}", key, value, unit);
+        println!("{:<24} {:>16} {}", key, value, unit);
     }
 }
 
