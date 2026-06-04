@@ -50,7 +50,7 @@ pub async fn run_led_socket(
     device: Arc<Mutex<HalpiDevice>>,
     num_leds: usize,
     socket_path: PathBuf,
-    socket_group: String,
+    socket_gid: u32,
 ) -> anyhow::Result<()> {
     // Remove existing socket if it exists
     if socket_path.exists() {
@@ -65,7 +65,7 @@ pub async fn run_led_socket(
     let listener = UnixListener::bind(&socket_path)?;
 
     // Reuse shared socket permission setup from app.rs
-    setup_socket_permissions(&socket_path, &socket_group).await?;
+    setup_socket_permissions(&socket_path, socket_gid).await?;
 
     info!("LED socket listening on {}", socket_path.display());
 

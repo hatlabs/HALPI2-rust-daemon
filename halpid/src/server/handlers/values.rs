@@ -189,7 +189,7 @@ mod tests {
             Err(_) => return,
         };
         let config = Arc::new(RwLock::new(Config::default()));
-        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS);
+        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS, 0);
 
         let response = get_all_values(State(state)).await;
         // Response will be 500 if no I2C device, but should be a valid response structure
@@ -207,7 +207,7 @@ mod tests {
             Err(_) => return,
         };
         let config = Arc::new(RwLock::new(Config::default()));
-        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS);
+        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS, 0);
 
         let response = get_value(State(state), Path("invalid_key".to_string())).await;
         assert_eq!(response.status(), StatusCode::NOT_FOUND);

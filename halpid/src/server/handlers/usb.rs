@@ -184,7 +184,7 @@ mod tests {
             Err(_) => return,
         };
         let config = Arc::new(RwLock::new(Config::default()));
-        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS);
+        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS, 0);
 
         let response = get_all_usb(State(state)).await;
         assert!(
@@ -200,7 +200,7 @@ mod tests {
             Err(_) => return,
         };
         let config = Arc::new(RwLock::new(Config::default()));
-        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS);
+        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS, 0);
 
         let response = get_usb(State(state), Path(0)).await;
         assert!(
@@ -216,7 +216,7 @@ mod tests {
             Err(_) => return,
         };
         let config = Arc::new(RwLock::new(Config::default()));
-        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS);
+        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS, 0);
 
         let response = get_usb(State(state), Path(4)).await;
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);

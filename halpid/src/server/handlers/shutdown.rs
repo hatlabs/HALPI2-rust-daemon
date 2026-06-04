@@ -152,7 +152,7 @@ mod tests {
             Err(_) => return,
         };
         let config = Arc::new(RwLock::new(Config::default()));
-        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS);
+        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS, 0);
 
         let response = post_shutdown(State(state)).await;
         // Will be 204 or 500 depending on I2C availability
