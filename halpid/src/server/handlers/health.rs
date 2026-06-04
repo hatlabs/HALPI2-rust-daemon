@@ -49,7 +49,7 @@ mod tests {
             Err(_) => return,
         };
         let config = Arc::new(RwLock::new(Config::default()));
-        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS);
+        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS, 0);
 
         let response = version(State(state)).await;
         assert_eq!(response.status(), StatusCode::OK);

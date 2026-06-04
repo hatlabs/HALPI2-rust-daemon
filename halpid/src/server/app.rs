@@ -22,6 +22,8 @@ pub struct AppState {
     pub version: &'static str,
     /// Number of LEDs on this hardware (derived from hardware version at startup)
     pub num_leds: usize,
+    /// GID owning the control socket (resolved once at startup)
+    pub socket_gid: u32,
 }
 
 impl AppState {
@@ -30,12 +32,14 @@ impl AppState {
         device: Arc<Mutex<HalpiDevice>>,
         config: Arc<RwLock<Config>>,
         num_leds: usize,
+        socket_gid: u32,
     ) -> Self {
         Self {
             device,
             config,
             version: env!("CARGO_PKG_VERSION"),
             num_leds,
+            socket_gid,
         }
     }
 }
@@ -66,7 +70,7 @@ pub async fn run_server(state: AppState) -> anyhow::Result<()> {
     let listener = UnixListener::bind(&socket_path)?;
 
     // Set socket permissions and group ownership
-    setup_socket_permissions(&socket_path, "halpid").await?;
+    setup_socket_permissions(&socket_path, state.socket_gid).await?;
 
     tracing::info!("HTTP server listening on {}", socket_path.display());
 
@@ -116,35 +120,16 @@ pub fn create_app(state: AppState) -> Router {
         .with_state(state)
 }
 
-/// Set Unix socket permissions and group ownership
+/// Resolve a group name to its GID.
+///
+/// Wraps the non-reentrant `getgrnam(3)`. Call this from a single thread before
+/// spawning the socket tasks: concurrent `getgrnam` calls race on libc's shared
+/// getgrent state and, under musl, corrupt the allocator (heap free of a bad
+/// pointer → SIGSEGV).
 #[cfg(unix)]
-pub async fn setup_socket_permissions(
-    socket_path: &Path,
-    group_name: &str,
-) -> Result<(), AppError> {
-    use std::os::unix::fs::PermissionsExt;
-
-    // Set permissions to 0660 (rw-rw----)
-    let permissions = std::fs::Permissions::from_mode(0o660);
-    std::fs::set_permissions(socket_path, permissions).map_err(|e| {
-        ServerError::SetPermissionsFailed {
-            path: socket_path.to_path_buf(),
-            source: e,
-        }
-    })?;
-
-    // Set group ownership
-    set_socket_group(socket_path, group_name)?;
-
-    Ok(())
-}
-
-/// Set the group ownership of the socket file
-#[cfg(unix)]
-fn set_socket_group(socket_path: &Path, group_name: &str) -> Result<(), AppError> {
+pub fn resolve_group_gid(group_name: &str) -> Result<u32, AppError> {
     use std::ffi::CString;
 
-    // Get group ID from group name
     let group_name_c = CString::new(group_name).map_err(|_| ServerError::ChangeGroupFailed {
         group: group_name.to_string(),
         source: std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid group name"),
@@ -159,30 +144,48 @@ fn set_socket_group(socket_path: &Path, group_name: &str) -> Result<(), AppError
         .into());
     }
 
-    let gid = unsafe { (*grp).gr_gid };
+    Ok(unsafe { (*grp).gr_gid })
+}
 
-    // Get current user ID (don't change ownership)
+/// Set Unix socket permissions and group ownership.
+///
+/// Takes a pre-resolved GID (see [`resolve_group_gid`]) rather than a group name,
+/// so no `getgrnam` lookup happens here — keeping the concurrently-spawned socket
+/// tasks free of that non-reentrant call.
+#[cfg(unix)]
+pub async fn setup_socket_permissions(socket_path: &Path, gid: u32) -> Result<(), AppError> {
+    use std::ffi::CString;
+    use std::os::unix::fs::PermissionsExt;
+
+    // Set permissions to 0660 (rw-rw----)
+    let permissions = std::fs::Permissions::from_mode(0o660);
+    std::fs::set_permissions(socket_path, permissions).map_err(|e| {
+        ServerError::SetPermissionsFailed {
+            path: socket_path.to_path_buf(),
+            source: e,
+        }
+    })?;
+
+    // Set group ownership, keeping the current owning user.
     let uid = unsafe { libc::getuid() };
-
-    // Change ownership - handle invalid UTF-8 in path
     let path_str = socket_path
         .to_str()
         .ok_or_else(|| ServerError::ChangeGroupFailed {
-            group: group_name.to_string(),
+            group: gid.to_string(),
             source: std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "socket path is not valid UTF-8",
             ),
         })?;
     let path_c = CString::new(path_str).map_err(|_| ServerError::ChangeGroupFailed {
-        group: group_name.to_string(),
+        group: gid.to_string(),
         source: std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid path"),
     })?;
 
     let result = unsafe { libc::chown(path_c.as_ptr(), uid, gid) };
     if result != 0 {
         return Err(ServerError::ChangeGroupFailed {
-            group: group_name.to_string(),
+            group: gid.to_string(),
             source: std::io::Error::last_os_error(),
         }
         .into());
@@ -203,7 +206,7 @@ mod tests {
             Err(_) => return,
         };
         let config = Arc::new(RwLock::new(Config::default()));
-        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS);
+        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS, 0);
 
         assert_eq!(state.version, env!("CARGO_PKG_VERSION"));
     }
@@ -216,7 +219,7 @@ mod tests {
             Err(_) => return,
         };
         let config = Arc::new(RwLock::new(Config::default()));
-        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS);
+        let state = AppState::new(device, config, halpi_common::protocol::DEFAULT_NUM_LEDS, 0);
 
         let _app = create_app(state);
         // If this compiles and runs, the router is created successfully

@@ -131,10 +131,32 @@ async fn main() {
         n
     };
 
+    // Resolve socket group GIDs once, on this single thread, before spawning the
+    // server and LED socket tasks. getgrnam(3) is not reentrant; calling it
+    // concurrently from both tasks races on libc's shared getgrent state and
+    // corrupts the allocator (heap free of a bad pointer → SIGSEGV under musl).
+    let socket_gid = match server::app::resolve_group_gid("halpid") {
+        Ok(gid) => gid,
+        Err(e) => {
+            error!("Failed to resolve socket group \"halpid\": {}", e);
+            std::process::exit(1);
+        }
+    };
+    let led_socket_gid = match server::app::resolve_group_gid(&config.socket_group) {
+        Ok(gid) => gid,
+        Err(e) => {
+            error!(
+                "Failed to resolve LED socket group \"{}\": {}",
+                config.socket_group, e
+            );
+            std::process::exit(1);
+        }
+    };
+
     let config_arc = Arc::new(RwLock::new(config.clone()));
 
     // Create shared state for HTTP server
-    let app_state = AppState::new(device.clone(), config_arc.clone(), num_leds);
+    let app_state = AppState::new(device.clone(), config_arc.clone(), num_leds, socket_gid);
 
     // Get socket paths for cleanup
     let socket_path = config
@@ -160,11 +182,10 @@ async fn main() {
     let led_socket_handle = {
         let device = device.clone();
         let led_path = led_socket_path.clone();
-        let led_group = config.socket_group.clone();
         tokio::spawn(async move {
             info!("Starting LED socket");
             if let Err(e) =
-                server::led_socket::run_led_socket(device, num_leds, led_path, led_group).await
+                server::led_socket::run_led_socket(device, num_leds, led_path, led_socket_gid).await
             {
                 error!("LED socket error: {}", e);
             }
