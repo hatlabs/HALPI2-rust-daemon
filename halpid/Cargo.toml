@@ -43,8 +43,8 @@ name = "halpid"
 conflicts = "halpi2-rust-daemon"
 replaces = "halpi2-rust-daemon"
 provides = "halpi2-rust-daemon"
-maintainer = "Hat Labs Ltd. <info@hatlabs.fi>"
-copyright = "2025, Hat Labs Ltd."
+maintainer = "Hat Labs Oy <info@hatlabs.fi>"
+copyright = "2025, Hat Labs Oy"
 license-file = ["../LICENSE", "0"]
 extended-description = """\
 HALPI2 power monitoring and watchdog daemon.
