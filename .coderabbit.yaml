@@ -1,0 +1,124 @@
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+
+language: en-GB
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+
+  path_filters:
+    - "!.claude/**"
+
+  path_instructions:
+    - path: "**/*.rs"
+      instructions: |
+        `halpid` must stay 100% API-compatible with the Python `halpid` 4.x it
+        replaces. HTTP endpoint paths, JSON field names, CLI subcommand names and
+        output format, and configuration file keys are a frozen wire contract with
+        deployed devices. A clearer name is still a breaking change. Do not suggest
+        renaming any of them, even when the current name is inconsistent or
+        misspelled. Suggestions that add a new field or endpoint alongside the old
+        one are fine; suggestions that change or remove an existing one are not.
+
+        This daemon is Linux-only and is built only for
+        `aarch64-unknown-linux-musl`. `cfg(target_os = "linux")` guards are
+        deliberately absent: cross-compilation and the Docker test container both
+        make the target Linux, so the guards would always be true. Do not ask for
+        them, and do not ask for a macOS or Windows build path.
+
+        The daemon runs as root by design. It needs that for I2C device access and
+        to invoke shutdown. Dropping privileges is not an available fix, so do not
+        raise root execution as a finding on its own. Do raise a concrete
+        privilege-related defect: an unvalidated path used in a privileged
+        operation, a world-writable file mode, or a command built from external
+        input.
+
+        Hardware tests use `match HalpiDevice::new() { Ok(d) => d, Err(_) => return }`
+        to skip when no I2C device is present. CI and macOS both lack the hardware.
+        That early return is intentional, not a swallowed error. Do raise a test
+        that returns early for an unrelated reason, or one that asserts nothing on
+        the path where the device *is* present.
+    - path: "halpid/src/**/*.rs"
+      instructions: |
+        The state machine polls at a 0.1 second interval. This value is a
+        behavioural requirement inherited from the Python implementation, not a
+        tuning choice. Do not suggest raising it, backing it off, or making it
+        configurable to reduce wakeups.
+
+        The RP2040 firmware speaks raw I2C, not SMBus. Reads and writes must go
+        through `LinuxI2CMessage` with `transfer()`, because reads need a combined
+        write-read transaction with a repeated START. The `i2cdev` SMBus helper
+        functions look tidier and produce the wrong bus traffic. Do not suggest
+        them.
+
+        Watchdog feeding, shutdown orchestration order, and the firmware update
+        protocol are also fixed by the Python implementation. Review them for
+        defects against that behaviour, not for a better sequence.
+    - path: "halpi-common/src/**/*.rs"
+      instructions: |
+        This crate holds the I2C register addresses, API endpoint paths and shared
+        request and response types. The register values match RP2040 firmware that
+        is already flashed on shipped boards, and the types match deployed clients.
+        Treat every constant and every serialised field name here as fixed. Flag a
+        value that disagrees with `docs/SPEC.md`; do not propose a tidier layout,
+        an enum in place of the constants, or renamed fields.
+    - path: "halpid/debian/**"
+      instructions: |
+        Debian packaging for `halpid`. `lintian-overrides` entries are deliberate
+        and each one suppresses a warning that does not apply to a static musl
+        binary or to a daemon that must run as root. Do not ask for an override to
+        be removed without naming the specific lintian tag it covers and why that
+        tag now applies.
+
+        `postinst` and `prerm` run on live marine installations during an upgrade.
+        Flag any step that is not idempotent, that fails the upgrade on a
+        non-fatal error, or that stops the daemon without restarting it.
+    - path: ".github/**"
+      instructions: |
+        Release and packaging automation. Changes to a package-affecting file
+        require a `VERSION` bump; the shared `version-bump-check` workflow already
+        enforces this, so do not repeat it as a review comment.
+
+        `check-hardcoded-hostnames.sh` exists because this repository is public and
+        must not carry our internal hostnames, IP addresses or account names. Flag
+        any new literal that would defeat it. A vessel name, an MMSI or a place
+        name in test data is not covered by this rule and is fine.
+    - path: "docs/**/*.md"
+      instructions: |
+        These pages describe current behaviour. Do not ask for a changelog entry, a
+        "what changed in this PR" section, or a rejected-alternatives discussion.
+
+        This does not mean stripping justification. Where a rule has a cost behind
+        it — a timing value that a slower poll broke, an ordering that a failed
+        upgrade forced — that sentence is why the rule survives the next reader who
+        finds a tidier approach. Keep it. What does not belong is history that no
+        current rule depends on.
+
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+
+  tools:
+    clippy:
+      enabled: false
+    markdownlint:
+      enabled: false
+    languagetool:
+      enabled: false
+    actionlint:
+      enabled: true
+    shellcheck:
+      enabled: true
+    yamllint:
+      enabled: true
+    gitleaks:
+      enabled: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - AGENTS.md
+      - docs/*.md
